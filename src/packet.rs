@@ -131,9 +131,9 @@ pub struct WeatherForecast
     pub timeOffset: u8,               // Time in minutes the forecast is for
     pub weather: Weather,
     pub trackTemperature: i8,         // Track temp. in degrees Celsius
-    pub trackTemperatureChange: TrackTemperatureChange,
+    pub trackTemperatureChange: TemperatureChange,
     pub airTemperature: i8,           // Air temp. in degrees celsius
-    pub airTemperatureChange: AirTemperatureChange,
+    pub airTemperatureChange: TemperatureChange,
     pub rainPercentage: u8,           // Rain percentage (0-100)
 }
 
@@ -169,15 +169,7 @@ pub enum Weather {
 
 #[repr(i8)]
 #[derive(Debug, Clone, Copy)]
-pub enum TrackTemperatureChange {
-    Up = 0,
-    Down = 1,
-    None = 2
-}
-
-#[repr(i8)]
-#[derive(Debug, Clone, Copy)]
-pub enum AirTemperatureChange {
+pub enum TemperatureChange {
     Up = 0,
     Down = 1,
     None = 2
