@@ -127,19 +127,19 @@ pub enum ZoneFlag {
 #[derive(Debug, Clone, Copy)]
 pub struct WeatherForecast
 {
-    pub sessionType: SessionType,
+    pub sessionType: Session,
     pub timeOffset: u8,               // Time in minutes the forecast is for
     pub weather: Weather,
     pub trackTemperature: i8,         // Track temp. in degrees Celsius
-    pub trackTemperatureChange: TemperatureChange,
+    pub trackTemperatureChange: Temperature,
     pub airTemperature: i8,           // Air temp. in degrees celsius
-    pub airTemperatureChange: TemperatureChange,
+    pub airTemperatureChange: Temperature,
     pub rainPercentage: u8,           // Rain percentage (0-100)
 }
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
-pub enum SessionType {
+pub enum Session {
     Unknown = 0,
     Practice1 = 1,
     Practice2 = 2,
@@ -169,7 +169,7 @@ pub enum Weather {
 
 #[repr(i8)]
 #[derive(Debug, Clone, Copy)]
-pub enum TemperatureChange {
+pub enum Temperature {
     Up = 0,
     Down = 1,
     None = 2
@@ -185,7 +185,7 @@ pub struct PacketSession
     pub airTemperature: i8,             // Air temp. in degrees celsius
     pub totalLaps: u8,                  // Total number of laps in this race
     pub trackLength: u16,               // Track length in metres
-    pub sessionType: SessionType,
+    pub sessionType: Session,
     pub trackId: i8,                    // -1 for unknown, see appendix
     pub formula: Formula,
     pub sessionTimeLeft: u16,           // Time left in session in seconds
@@ -197,7 +197,7 @@ pub struct PacketSession
     pub sliProNativeSupport: u8,        // SLI Pro support, 0 = inactive, 1 = active
     pub numMarshalZones: u8,            // Number of marshal zones to follow
     pub marshalZones: [MarshalZone; 21],  // List of marshal zones – max 21
-    pub safetyCarStatus: SafetyCarStatus,
+    pub safetyCarStatus: SafetyCar,
     pub networkGame: u8,                // 0 = offline, 1 = online
     pub numWeatherForecasts: u8,  // Number of weather samples to follow
     pub weatherForecastSamples: [WeatherForecast; 56], // Array of weather forecast samples
@@ -239,9 +239,9 @@ pub enum Formula {
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
-pub enum SafetyCarStatus {
-    None = 0,
-    Full = 1,
+pub enum SafetyCar {
+    Ready = 0,
+    Deployed = 1,
     Virtual = 2,
     FormationLap = 3,
 }
@@ -286,7 +286,7 @@ pub struct Lap
     pub numUnservedDriveThroughPens: u8,    // Num drive through pens left to serve
     pub numUnservedStopGoPens: u8,          // Num stop go pens left to serve
     pub gridPosition: u8,                   // Grid position the vehicle started the race in
-    pub driverStatus: DriverStatus,
+    pub driverStatus: Driver,
     pub resultStatus: ResultStatus,
     pub pitLaneTimerActive: u8,             // Pit lane timing, 0 = inactive, 1 = active
     pub pitLaneTimeInLaneInMS: u16,         // If active, the current time spent in the pit lane in ms
@@ -304,9 +304,9 @@ pub enum PitStatus {
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
-pub enum DriverStatus {
+pub enum Driver {
     InGarage = 0,
-    FlyingLap = 1,
+    OnFlyingLap = 1,
     InLap = 2,
     OutLap = 3,
     OnTrack = 4,
@@ -328,9 +328,9 @@ pub enum ResultStatus {
 #[derive(Debug, Clone, Copy)]
 pub struct PacketLap
 {
-    pub header: Header,               // Header
+    pub header: Header,                     // Header
 
-    pub laps: [Lap; 22],             // Lap data for allpub  cars on track
+    pub laps: [Lap; 22],                    // Lap data for allpub  cars on track
 
     pub timeTrialPBCarIdx: u8,              // Index of Personal Best car in time trial (255 if invalid)
     pub timeTrialRivalCarIdx: u8,           // Index of Rival car in time trial (255 if invalid)
@@ -346,83 +346,108 @@ pub struct PacketLap
 
 // The event details packet is different for each type of event.
 // Make sure only the correct type is interpreted.
-union EventDetails {
-    pub struct FastestLap
-    {
-        pub vehicleIdx: u8,                 // Vehicle index of car achieving fastest lap
-        pub lapTime: f32,                   // Lap time is in seconds
-    },
-
-    pub struct Retirement
-    {
-        pub vehicleIdx: u8,                 // Vehicle index of car retiring
-    },
-
-    pub struct TeamMateInPits
-    {
-        pub vehicleIdx: u8,                 // Vehicle index of team mate
-    },
-
-    pub struct RaceWinner
-    {
-        pub vehicleIdx: u8;                 // Vehicle index of the race winner
-    },
-
-    pub struct Penalty
-    {
-        pub penaltyType: u8,                // Penalty type – see Appendices
-        pub infringementType: u8,           // Infringement type – see Appendices
-        pub vehicleIdx: u8,                 // Vehicle index of the car the penalty is applied to
-        pub otherVehicleIdx: u8,            // Vehicle index of the other car involved
-        pub time: u8,                       // Time gained, or time spent doing action in seconds
-        pub lapNum: u8,                     // Lap the penalty occurred on
-        pub placesGained: u8,               // Number of places gained by this
-    },
-
-    pub struct SpeedTrap
-    {
-        pub vehicleIdx: u8,                 // Vehicle index of the vehicle triggering speed trap
-        pub speed: f32,                     // Top speed achieved in kilometres per hour
-        pub isOverallFastestInSession: u8,  // Overall fastest speed in session = 1, otherwise 0
-        pub isDriverFastestInSession: u8,   // Fastest speed for driver in session = 1, otherwise 0
-        pub fastestVehicleIdxInSession: u8, // Vehicle index of the vehicle that is the fastest in this session
-        pub fastestSpeedInSession: f32,     // Speed of the vehicle that is the fastest in this session
-    },
-
-    pub struct StartLights
-    {
-        pub numLights: u8,                  // Number of lights showing
-    },
-
-    pub struct DriveThroughPenaltyServed
-    {
-        pub vehicleIdx: u8,                 // Vehicle index of the vehicle serving drive through
-    },
-
-    pub struct StopGoPenaltyServed
-    {
-        pub vehicleIdx: u8,                 // Vehicle index of the vehicle serving stop go
-    },
-
-    pub struct Flashback
-    {
-        pub flashbackFrameIdentifier: u32,  // Frame identifier flashed back to
-        pub flashbackSessionTime: f32,      // Session time flashed back to
-    },
-
-    pub struct Buttons
-    {
-        pub buttonStatus: u32,              // Bit flags specifying which buttons are being pressed currently - see appendices
-    },
+#[derive(Clone, Copy)]
+union EventDetails
+{
+    pub fastestLap: FastestLap,
+    pub retirement: Retirement,
+    pub teamMateInPits: TeamMateInPits,
+    pub raceWinner: RaceWinner,
+    pub penalty: Penalty,
+    pub speedTrap: SpeedTrap,
+    pub startLights: StartLights,
+    pub driveThroughPenaltyServed: DriveThroughPenaltyServed,
+    pub stopGoPenaltyServed: StopGoPenaltyServed,
+    pub flashback: Flashback,
+    pub buttons: Buttons,
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct FastestLap
+{
+    pub vehicleIdx: u8,                 // Vehicle index of car achieving fastest lap
+    pub lapTime: f32,                   // Lap time is in seconds
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Retirement
+{
+    pub vehicleIdx: u8,                 // Vehicle index of car retiring
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TeamMateInPits
+{
+    pub vehicleIdx: u8,                 // Vehicle index of team mate
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct RaceWinner
+{
+    pub vehicleIdx: u8,                 // Vehicle index of the race winner
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Penalty
+{
+    pub penaltyType: u8,                // Penalty type – see Appendices
+    pub infringementType: u8,           // Infringement type – see Appendices
+    pub vehicleIdx: u8,                 // Vehicle index of the car the penalty is applied to
+    pub otherVehicleIdx: u8,            // Vehicle index of the other car involved
+    pub time: u8,                       // Time gained, or time spent doing action in seconds
+    pub lapNum: u8,                     // Lap the penalty occurred on
+    pub placesGained: u8,               // Number of places gained by this
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SpeedTrap
+{
+    pub vehicleIdx: u8,                 // Vehicle index of the vehicle triggering speed trap
+    pub speed: f32,                     // Top speed achieved in kilometres per hour
+    pub isOverallFastestInSession: u8,  // Overall fastest speed in session = 1, otherwise 0
+    pub isDriverFastestInSession: u8,   // Fastest speed for driver in session = 1, otherwise 0
+    pub fastestVehicleIdxInSession: u8, // Vehicle index of the vehicle that is the fastest in this session
+    pub fastestSpeedInSession: f32,     // Speed of the vehicle that is the fastest in this session
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct StartLights
+{
+    pub numLights: u8,                  // Number of lights showing
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct DriveThroughPenaltyServed
+{
+    pub vehicleIdx: u8,                 // Vehicle index of the vehicle serving drive through
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct StopGoPenaltyServed
+{
+    pub vehicleIdx: u8,                 // Vehicle index of the vehicle serving stop go
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Flashback
+{
+    pub flashbackFrameIdentifier: u32,  // Frame identifier flashed back to
+    pub flashbackSessionTime: f32,      // Session time flashed back to
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Buttons
+{
+    pub buttonStatus: u32,              // Bit flags specifying which buttons are being pressed currently - see appendices
+}
+
+#[derive(Clone, Copy)]
 pub struct PacketEvent
 {
     pub header: Header,                     // Header
 
     pub eventStringCode: EventStringCode,   // Event string code, see below
-    pub eventDetails: EventDetails,     // Event details - should be interpreted differently for each type
+    pub eventDetails: EventDetails,         // Event details - should be interpreted differently for each type
 }
 
 /**
