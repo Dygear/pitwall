@@ -387,7 +387,7 @@ pub struct PacketLap
 // The event details packet is different for each type of event.
 // Make sure only the correct type is interpreted.
 #[derive(Clone, Copy)]
-union EventDetails
+pub union EventDetails
 {
     pub fastestLap: FastestLap,
     pub retirement: Retirement,

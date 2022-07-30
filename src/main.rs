@@ -11,13 +11,15 @@ fn main() {
     let socket = UdpSocket::bind("0.0.0.0:20777").expect("Couldn't bind to address.");
     println!("UDP Port Bound");
 
+    let mut count: usize = 0;
     let mut buffer = [0; 4096];
     loop
     {
+        count += 1;
         let (size, socketAddress) = socket.recv_from(&mut buffer).unwrap();
         let packet: packet::Header = packet::Header::unpack(&buffer);
 
-        println!("Got packet from {socketAddress} of size {size}.");
+        println!("Got packet number {count} from {socketAddress} of size {size}.");
         dbg!(packet);
     }
 }
