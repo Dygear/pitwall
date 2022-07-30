@@ -14,11 +14,10 @@ fn main() {
     let mut buffer = [0; 4096];
     loop
     {
-        let (_numBytes, socketAddress) = socket.recv_from(&mut buffer).unwrap();
-        let packet: packet::Header = match packet::Header::unpack(&buffer)
-        {
-            Some(packet) => packet,
-            None => { continue; }
-        };
+        let (size, socketAddress) = socket.recv_from(&mut buffer).unwrap();
+        let packet: packet::Header = packet::Header::unpack(&buffer);
+
+        println!("Got packet from {socketAddress} of size {size}.");
+        dbg!(packet);
     }
 }

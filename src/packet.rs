@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![allow(dead_code)]
 
 // https://answers.ea.com/t5/General-Discussion/F1-22-UDP-Specification/td-p/11551274
 
@@ -14,12 +15,31 @@ pub struct Header
     pub gameMajorVersion: u8,           // Game major version - "X.00"
     pub gameMinorVersion: u8,           // Game minor version - "1.XX"
     pub packetVersion: u8,              // Version of this packet type, all start from 1
-    pub packetId: PacketId,             // Identifier for the packet type, see below
+    pub packetId: Option<PacketId>,     // Identifier for the packet type, see below
     pub sessionUID: u64,                // Unique identifier for the session
     pub sessionTime: f32,               // Session timestamp
     pub frameIdentifier: u32,           // Identifier for the frame the data was retrieved on
     pub playerCarIndex: u8,             // Index of player's car in the array
     pub secondaryPlayerCarIndex: u8,    // Index of secondary player's car in the array (splitscreen) 255 if no second player
+}
+
+impl Header
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            packetFormat           : u16::from_le_bytes([bytes[0], bytes[1]]),
+            gameMajorVersion       : bytes[2],
+            gameMinorVersion       : bytes[3],
+            packetVersion          : bytes[4],
+            packetId               : PacketId::from_u8(bytes[5]),
+            sessionUID             : u64::from_le_bytes([bytes[6], bytes[7], bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13]]),
+            sessionTime            : f32::from_le_bytes([bytes[14], bytes[15], bytes[16], bytes[17]]),
+            frameIdentifier        : u32::from_le_bytes([bytes[18], bytes[19], bytes[20], bytes[21]]),
+            playerCarIndex         : bytes[22],
+            secondaryPlayerCarIndex: bytes[23],
+        }
+    }
 }
 
 /**
@@ -41,6 +61,26 @@ pub enum PacketId {
     LobbyInfo = 9,                      // Information about players in a multiplayer lobby
     CarDamage = 10,                     // Damage status for all cars
     SessionHistory = 11                 // Lap and tyre data for session
+}
+
+impl PacketId {
+    fn from_u8(value: u8) -> Option<PacketId> {
+        match value {
+            0 => Some(PacketId::Motion),
+            1 => Some(PacketId::Session),
+            2 => Some(PacketId::LapData),
+            3 => Some(PacketId::Event),
+            4 => Some(PacketId::Participants),
+            5 => Some(PacketId::CarSetups),
+            6 => Some(PacketId::CarTelemetry),
+            7 => Some(PacketId::CarStatus),
+            8 => Some(PacketId::FinalClassification),
+            9 => Some(PacketId::LobbyInfo),
+            10=> Some(PacketId::CarDamage),
+            11=> Some(PacketId::SessionHistory),
+            _ => None,
+        }
+    }
 }
 
 /**
