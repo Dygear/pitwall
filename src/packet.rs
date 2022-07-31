@@ -122,6 +122,30 @@ pub struct CarMotion
 
 impl CarMotion
 {
+    pub fn new() -> Self
+    {
+        Self {
+            worldPositionX    : 0.0,
+            worldPositionY    : 0.0,
+            worldPositionZ    : 0.0,
+            worldVelocityX    : 0.0,
+            worldVelocityY    : 0.0,
+            worldVelocityZ    : 0.0,
+            worldForwardDirX  : 0,
+            worldForwardDirY  : 0,
+            worldForwardDirZ  : 0,
+            worldRightDirX    : 0,
+            worldRightDirY    : 0,
+            worldRightDirZ    : 0,
+            gForceLateral     : 0.0,
+            gForceLongitudinal: 0.0,
+            gForceVertical    : 0.0,
+            yaw               : 0.0,
+            pitch             : 0.0,
+            roll              : 0.0,
+        }
+    }
+
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
@@ -227,19 +251,24 @@ impl PacketMotion
         }
     }
 
-    pub fn carMotion(bytes: &[u8]) -> [CarMotion; 22]
+    pub fn carMotion(_bytes: &[u8]) -> [CarMotion; 22]
     {
         use std::mem::size_of;
 
-        let cmSize = size_of::<CarMotion>();
-        let mut bOffset = size_of::<Header>();
+        let cm = [CarMotion::new(); 22];
 
-        for structWindow in &bytes[bOffset..cmSize]
+        let size = size_of::<CarMotion>();
+        let start = size_of::<Header>();
+        let mut offset = size_of::<Header>();
+
+        for i in 1..22
         {
-            // Yeah, I'm lost.
-        
-}
+            println!("Offset: {offset}");
 
+            offset = start + (i * size);
+        }
+
+        cm
     }
 }
 
