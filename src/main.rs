@@ -26,6 +26,9 @@ fn main() {
             Some(packet::PacketId::Motion) => {
                 dbg!(packet::PacketMotion::unpack(&buffer));
             },
+            Some(packet::PacketId::SessionHistory) => {
+                dbg!(packet::PacketSessionHistory::unpack(&buffer));
+            }
             Some(_x) => {
                 dbg!(header);
                 println!("{} {:#?}", "Unhandled packetId".yellow(), header.packetId.unwrap());

@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
-
+use std::mem::size_of;
 
 // https://answers.ea.com/t5/General-Discussion/F1-22-UDP-Specification/td-p/11551274
 
@@ -11,7 +11,7 @@
  */
 
 // Size: 24 Bytes
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Header
 {
     pub packetFormat: u16,              // 2022
@@ -50,8 +50,9 @@ impl Header
  * The packets IDs are as follows
  */
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum PacketId {
+    #[default]
     Motion = 0,                         // Contains all motion data for player’s car – only sent while player is in control
     Session = 1,                        // Data about the session – track, time left
     LapData = 2,                        // Data about all the lap times of cars in the session
@@ -96,7 +97,7 @@ impl PacketId {
  */
 
 // Size: 60 Bytes
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 #[repr(packed)]
 pub struct CarMotion
 {
@@ -122,30 +123,6 @@ pub struct CarMotion
 
 impl CarMotion
 {
-    pub fn new() -> Self
-    {
-        Self {
-            worldPositionX    : 0.0,
-            worldPositionY    : 0.0,
-            worldPositionZ    : 0.0,
-            worldVelocityX    : 0.0,
-            worldVelocityY    : 0.0,
-            worldVelocityZ    : 0.0,
-            worldForwardDirX  : 0,
-            worldForwardDirY  : 0,
-            worldForwardDirZ  : 0,
-            worldRightDirX    : 0,
-            worldRightDirY    : 0,
-            worldRightDirZ    : 0,
-            gForceLateral     : 0.0,
-            gForceLongitudinal: 0.0,
-            gForceVertical    : 0.0,
-            yaw               : 0.0,
-            pitch             : 0.0,
-            roll              : 0.0,
-        }
-    }
-
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
@@ -172,7 +149,7 @@ impl CarMotion
 }
 
 // Size: 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct PacketMotion
 {
     pub header: Header,                     // Header
@@ -253,9 +230,7 @@ impl PacketMotion
 
     pub fn carMotion(bytes: &[u8]) -> [CarMotion; 22]
     {
-        use std::mem::size_of;
-
-        let mut cm = [CarMotion::new(); 22];
+        let mut cm = [CarMotion::default(); 22];
 
         let size = size_of::<CarMotion>();
         let start = size_of::<Header>();
@@ -282,7 +257,7 @@ impl PacketMotion
  * Size: 632 bytes
  * Version: 1
  */
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct MarshalZone
 {
     pub zoneStart: f32,                // Fraction (0..1) of way through the lap the marshal zone starts
@@ -290,8 +265,9 @@ pub struct MarshalZone
 }
 
 #[repr(i8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum ZoneFlag {
+    #[default]
     Invalid = -1,
     None = 0,
     Green = 1,
@@ -300,22 +276,23 @@ pub enum ZoneFlag {
     Red = 4,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct WeatherForecast
 {
-    pub sessionType: Session,
-    pub timeOffset: u8,               // Time in minutes the forecast is for
-    pub weather: Weather,
-    pub trackTemperature: i8,         // Track temp. in degrees Celsius
-    pub trackTemperatureChange: Temperature,
-    pub airTemperature: i8,           // Air temp. in degrees celsius
-    pub airTemperatureChange: Temperature,
-    pub rainPercentage: u8,           // Rain percentage (0-100)
+    pub sessionType: Session,               // u8
+    pub timeOffset: u8,                     // Time in minutes the forecast is for
+    pub weather: Weather,                   // u8
+    pub trackTemperature: i8,               // Track temp. in degrees Celsius
+    pub trackTemperatureChange: Temperature,// i8
+    pub airTemperature: i8,                 // Air temp. in degrees celsius
+    pub airTemperatureChange: Temperature,  // i8
+    pub rainPercentage: u8,                 // Rain percentage (0-100)
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum Session {
+    #[default]
     Unknown = 0,
     Practice1 = 1,
     Practice2 = 2,
@@ -333,8 +310,9 @@ pub enum Session {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum Weather {
+    #[default]
     Clear = 0,
     LightCloud = 1,
     Overcast = 2,
@@ -344,10 +322,11 @@ pub enum Weather {
 }
 
 #[repr(i8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum Temperature {
     Up = 0,
     Down = 1,
+    #[default]
     None = 2
 }
 
@@ -356,14 +335,14 @@ pub struct PacketSession
 {
     pub header: Header,                 // Header
 
-    pub weather: Weather,
+    pub weather: Weather,               // u8
     pub trackTemperature: i8,           // Track temp. in degrees celsius
     pub airTemperature: i8,             // Air temp. in degrees celsius
     pub totalLaps: u8,                  // Total number of laps in this race
     pub trackLength: u16,               // Track length in metres
-    pub sessionType: Session,
+    pub sessionType: Session,           // u8
     pub trackId: i8,                    // -1 for unknown, see appendix
-    pub formula: Formula,
+    pub formula: Formula,               // u8
     pub sessionTimeLeft: u16,           // Time left in session in seconds
     pub sessionDuration: u16,           // Session duration in seconds
     pub pitSpeedLimit: u8,              // Pit speed limit in kilometres per hour
@@ -373,7 +352,7 @@ pub struct PacketSession
     pub sliProNativeSupport: u8,        // SLI Pro support, 0 = inactive, 1 = active
     pub numMarshalZones: u8,            // Number of marshal zones to follow
     pub marshalZones: [MarshalZone; 21],// List of marshal zones – max 21
-    pub safetyCarStatus: SafetyCar,
+    pub safetyCarStatus: SafetyCar,     // u8
     pub networkGame: u8,                // 0 = offline, 1 = online
     pub numWeatherForecasts: u8,        // Number of weather samples to follow
     pub weatherForecastSamples: [WeatherForecast; 56], // Array of weather forecast samples
@@ -397,12 +376,13 @@ pub struct PacketSession
     pub gameMode: u8,                   // Game mode id - see appendix
     pub ruleSet: u8,                    // Ruleset - see appendix
     pub timeOfDay: u32,                 // Local time of day - minutes since midnight
-    pub sessionLength: SessionLength,
+    pub sessionLength: SessionLength,   // u8
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum Formula {
+    #[default]
     Modern = 0,
     Classic = 1,
     Formula2 = 2,
@@ -414,8 +394,9 @@ pub enum Formula {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum SafetyCar {
+    #[default]
     Ready = 0,
     Deployed = 1,
     Virtual = 2,
@@ -423,15 +404,16 @@ pub enum SafetyCar {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum SessionLength {
-     None = 0,
-     VeryShort = 2,
-     Short = 3,
-     Medium = 4,
-     MediumLong = 5,
-     Long = 6,
-     Full = 7
+    #[default]
+    None = 0,
+    VeryShort = 2,
+    Short = 3,
+    Medium = 4,
+    MediumLong = 5,
+    Long = 6,
+    Full = 7
 }
 
 /**
@@ -441,7 +423,7 @@ pub enum SessionLength {
  * Size: 972 bytes
  * Version: 1
  */
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Lap
 {
     pub lastLapTimeInMS: u32,               // Last lap time in milliseconds
@@ -471,16 +453,18 @@ pub struct Lap
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum PitStatus {
+    #[default]
     None = 0,
     Pitting = 1,
     InPitArea = 2,
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum Driver {
+    #[default]
     InGarage = 0,
     OnFlyingLap = 1,
     InLap = 2,
@@ -489,8 +473,9 @@ pub enum Driver {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum ResultStatus {
+    #[default]
     Invalid = 0,
     Inactive = 1,
     Active = 2,
@@ -501,15 +486,15 @@ pub enum ResultStatus {
     Retired = 7,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct PacketLap
 {
-    pub header: Header,                     // Header
+    pub header: Header,                 // Header
 
-    pub laps: [Lap; 22],                    // Lap data for allpub  cars on track
+    pub laps: [Lap; 22],                // Lap data for allpub  cars on track
 
-    pub timeTrialPBCarIdx: u8,              // Index of Personal Best car in time trial (255 if invalid)
-    pub timeTrialRivalCarIdx: u8,           // Index of Rival car in time trial (255 if invalid)
+    pub timeTrialPBCarIdx: u8,          // Index of Personal Best car in time trial (255 if invalid)
+    pub timeTrialRivalCarIdx: u8,       // Index of Rival car in time trial (255 if invalid)
 }
 
 /**
@@ -538,32 +523,73 @@ pub union EventDetails
     pub buttons: Buttons,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct FastestLap
 {
     pub vehicleIdx: u8,                 // Vehicle index of car achieving fastest lap
     pub lapTime: f32,                   // Lap time is in seconds
 }
 
-#[derive(Debug, Clone, Copy)]
+impl FastestLap
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            vehicleIdx: bytes[0],
+            lapTime: f32::from_le_bytes([bytes[2], bytes[3], bytes[4], bytes[5]]),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Retirement
 {
     pub vehicleIdx: u8,                 // Vehicle index of car retiring
 }
 
-#[derive(Debug, Clone, Copy)]
+impl Retirement
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            vehicleIdx: bytes[0],
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct TeamMateInPits
 {
     pub vehicleIdx: u8,                 // Vehicle index of team mate
 }
 
-#[derive(Debug, Clone, Copy)]
+impl TeamMateInPits
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            vehicleIdx: bytes[0],
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct RaceWinner
 {
     pub vehicleIdx: u8,                 // Vehicle index of the race winner
 }
 
-#[derive(Debug, Clone, Copy)]
+impl RaceWinner
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            vehicleIdx: bytes[0],
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Penalty
 {
     pub penaltyType: u8,                // Penalty type – see Appendices
@@ -575,7 +601,23 @@ pub struct Penalty
     pub placesGained: u8,               // Number of places gained by this
 }
 
-#[derive(Debug, Clone, Copy)]
+impl Penalty
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            penaltyType: bytes[0],
+            infringementType: bytes[1],
+            vehicleIdx: bytes[2],
+            otherVehicleIdx: bytes[3],
+            time: bytes[4],
+            lapNum: bytes[5],
+            placesGained: bytes[6],
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct SpeedTrap
 {
     pub vehicleIdx: u8,                 // Vehicle index of the vehicle triggering speed trap
@@ -586,53 +628,122 @@ pub struct SpeedTrap
     pub fastestSpeedInSession: f32,     // Speed of the vehicle that is the fastest in this session
 }
 
-#[derive(Debug, Clone, Copy)]
+impl SpeedTrap
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            vehicleIdx: bytes[0],
+            speed: f32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]),
+            isOverallFastestInSession: bytes[5],
+            isDriverFastestInSession: bytes[6],
+            fastestVehicleIdxInSession: bytes[7],
+            fastestSpeedInSession: f32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
+        }
+    }
+}
+
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct StartLights
 {
     pub numLights: u8,                  // Number of lights showing
 }
 
-#[derive(Debug, Clone, Copy)]
+impl StartLights
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            numLights: bytes[0],
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct DriveThroughPenaltyServed
 {
     pub vehicleIdx: u8,                 // Vehicle index of the vehicle serving drive through
 }
 
-#[derive(Debug, Clone, Copy)]
+impl DriveThroughPenaltyServed
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            vehicleIdx: bytes[0],
+        }
+    }
+
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct StopGoPenaltyServed
 {
     pub vehicleIdx: u8,                 // Vehicle index of the vehicle serving stop go
 }
 
-#[derive(Debug, Clone, Copy)]
+impl StopGoPenaltyServed
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            vehicleIdx: bytes[0],
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Flashback
 {
     pub flashbackFrameIdentifier: u32,  // Frame identifier flashed back to
     pub flashbackSessionTime: f32,      // Session time flashed back to
 }
 
-#[derive(Debug, Clone, Copy)]
+impl Flashback
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            flashbackFrameIdentifier: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            flashbackSessionTime: f32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Buttons
 {
     pub buttonStatus: u32,              // Bit flags specifying which buttons are being pressed currently - see appendices
 }
 
-#[derive(Clone, Copy)]
-pub struct PacketEvent
+impl Buttons
 {
-    pub header: Header,                     // Header
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            buttonStatus: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+        }
+    }
+}
 
-    pub eventStringCode: EventStringCode,   // Event string code, see below
-    pub eventDetails: EventDetails,         // Event details - should be interpreted differently for each type
+#[derive(Clone, Copy)]
+pub struct PacketEvent<'a>
+{
+    pub header: Header,                 // Header
+
+    pub eventStringCode: [&'a str; 4],  // Event string code, see below
+    pub eventDetails: EventDetails,     // Event details - should be interpreted differently for each type
 }
 
 /**
  * # Event String Codes
  */
 #[repr(u32)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum EventStringCode
 {
+    #[default]
     SessionStarted = 0x83838465,            // "SSTA" Sent when the session starts
     SessionEnded = 0x83697868,              // "SEND" Sent when the session ends
     FastestLap = 0x70857680,                // "FTLP" When a driver achieves the fastest lap
@@ -691,7 +802,7 @@ pub struct PacketParticipantsData<'a>
  * Size: 1102 bytes
  * Version: 1
  */
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct CarSetup
 {
     pub frontWing: u8,                  // Front wing aero
@@ -718,7 +829,7 @@ pub struct CarSetup
     pub fuelLoad: f32,                  // Fuel load
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarSetup
 {
     pub header: Header,            // Header
@@ -733,7 +844,7 @@ pub struct PacketCarSetup
  * Size: 1347 bytes
  * Version: 1
  */
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct CarTelemetry
 {
     pub speed: u16,                         // Speed of car in kilometres per hour
@@ -746,15 +857,15 @@ pub struct CarTelemetry
     pub drs: u8,                            // 0 = off, 1 = on
     pub revLightsPercent: u8,               // Rev lights indicator (percentage)
     pub revLightsBitValue: u16,             // Rev lights (bit 0 = leftmost LED, bit 14 = rightmost LED)
-    pub brakesTemperature: [u16; 4],          // Brakes temperature (celsius)
-    pub tyresSurfaceTemperature: [u8; 4],     // Tyres surface temperature (celsius)
-    pub tyresInnerTemperature: [u8; 4],       // Tyres inner temperature (celsius)
+    pub brakesTemperature: [u16; 4],        // Brakes temperature (celsius)
+    pub tyresSurfaceTemperature: [u8; 4],   // Tyres surface temperature (celsius)
+    pub tyresInnerTemperature: [u8; 4],     // Tyres inner temperature (celsius)
     pub engineTemperature: u16,             // Engine temperature (celsius)
-    pub tyresPressure: [f32; 4],              // Tyres pressure (PSI)
-    pub surfaceType: [u8; 4],                 // Driving surface, see appendices
+    pub tyresPressure: [f32; 4],            // Tyres pressure (PSI)
+    pub surfaceType: [u8; 4],               // Driving surface, see appendices
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarTelemetry
 {
     pub header: Header,               // Header
@@ -773,7 +884,7 @@ pub struct PacketCarTelemetry
  * Size: 1058 bytes
  * Version: 1
  */
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct CarStatus
 {
     pub tractionControl: TractionControl,
@@ -808,17 +919,19 @@ pub struct CarStatus
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum TractionControl {
+    #[default]
     Off = 0,
     Medium = 1,
     Full = 2,
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum FuelMix {
     Lean = 0,
+    #[default]
     Standard = 1,
     Rich = 2,
     Max = 3,
@@ -828,15 +941,16 @@ pub enum FuelMix {
 // m_visualTyreCompound is a todo.
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum ErsDeployMode {
+    #[default]
     None = 0,
     Medium = 1,
     Hotlap = 2,
     Overtake = 3,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarStatus
 {
     pub header: Header,           // Header
@@ -851,7 +965,7 @@ pub struct PacketCarStatus
  * Size: 1015 bytes
  * Version: 1
  */
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct FinalClassification
 {
     pub position: u8,               // Finishing position
@@ -870,7 +984,7 @@ pub struct FinalClassification
     pub tyreStintsEndLaps: [u8; 8], // The lap number stints end on
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct PacketFinalClassification
 {
     pub header: Header,             // Header
@@ -898,9 +1012,10 @@ pub struct LobbyInfo<'a>
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum ReadyStatus {
     NotReady = 0,
+    #[default]
     Ready = 1,
     Spectating = 2,
 }
@@ -922,7 +1037,7 @@ pub struct PacketLobbyInfo<'a>
  * Size: 948 bytes
  * Version: 1
  */
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct CarDamage
 {
     pub tyresWear: [f32; 4],        // Tyre wear (percentage)
@@ -948,7 +1063,7 @@ pub struct CarDamage
     pub engineSeized: u8,           // Engine seized, 0 = OK, 1 = fault
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarDamage
 {
     pub header: Header,       // Header
@@ -964,7 +1079,7 @@ pub struct PacketCarDamage
  * Size: 1155 bytes
  * Version: 1
  */
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct LapHistory
 {
     pub lapTimeInMS: u32,       // Lap time in milliseconds
@@ -974,7 +1089,21 @@ pub struct LapHistory
     pub lapValidBitFlags: u8,   // 0x01 bit set-lap valid, 0x02 bit set-sector 1 valid 0x04 bit set-sector 2 valid, 0x08 bit set-sector 3 valid
 }
 
-#[derive(Debug, Clone, Copy)]
+impl LapHistory
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            lapTimeInMS     : u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            sector1TimeInMS : u16::from_le_bytes([bytes[4], bytes[5]]),
+            sector2TimeInMS : u16::from_le_bytes([bytes[6], bytes[7]]),
+            sector3TimeInMS : u16::from_le_bytes([bytes[8], bytes[9]]),
+            lapValidBitFlags: bytes[10]
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct TyreStintHistory
 {
     pub endLap: u8,             // Lap the tyre usage ends on (255 of current tyre)
@@ -982,8 +1111,20 @@ pub struct TyreStintHistory
     pub tyreVisualCompound: u8, // Visual tyres used by this driver
 }
 
+impl TyreStintHistory
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            endLap: bytes[0],
+            tyreActualCompound: bytes[1],
+            tyreVisualCompound: bytes[2]
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
-pub struct PacketSessionHistoryData
+pub struct PacketSessionHistory
 {
     pub header: Header,   // Header
 
@@ -998,4 +1139,61 @@ pub struct PacketSessionHistoryData
 
     pub lapHistory: [LapHistory; 100], // 100 laps of data max
     pub tyreStintsHistory: [TyreStintHistory; 8],
+}
+
+impl PacketSessionHistory
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            header           : Header::unpack(&bytes),
+            carIdx           : bytes[28],
+            numLaps          : bytes[29],
+            numTyreStints    : bytes[30],
+            bestLapTimeLapNum: bytes[31],
+            bestSector1LapNum: bytes[32],
+            bestSector2LapNum: bytes[33],
+            bestSector3LapNum: bytes[34],
+            lapHistory       : Self::lapHistory(&bytes),
+            tyreStintsHistory: Self::tyreStintHistory(&bytes),
+        }
+    }
+
+    pub fn lapHistory(bytes: &[u8]) -> [LapHistory; 100]
+    {
+        let mut lh = [LapHistory::default(); 100];
+
+        let size = size_of::<LapHistory>();
+
+        for i in 1..100
+        {
+            let offsetStart = 34 + (i * size);
+            let offsetEnd   = 34 + (i * size) + size;
+
+            println!("Offset: {offsetStart} .. {offsetEnd}");
+
+            lh[i] = LapHistory::unpack(&bytes[offsetStart..offsetEnd]);
+        }
+
+        lh
+    }
+
+    pub fn tyreStintHistory(bytes: &[u8]) -> [TyreStintHistory; 8]
+    {
+        let mut tsh = [TyreStintHistory::default(); 8];
+
+        let size = size_of::<TyreStintHistory>();
+
+        for i in 1..8
+        {
+            let offsetStart = 334 + (i * size);
+            let offsetEnd   = 334 + (i * size) + size;
+
+            println!("Offset: {offsetStart} .. {offsetEnd}");
+
+            tsh[i] = TyreStintHistory::unpack(&bytes[offsetStart..offsetEnd]);
+        }
+
+        tsh
+    }
 }
