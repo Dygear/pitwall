@@ -251,21 +251,23 @@ impl PacketMotion
         }
     }
 
-    pub fn carMotion(_bytes: &[u8]) -> [CarMotion; 22]
+    pub fn carMotion(bytes: &[u8]) -> [CarMotion; 22]
     {
         use std::mem::size_of;
 
-        let cm = [CarMotion::new(); 22];
+        let mut cm = [CarMotion::new(); 22];
 
         let size = size_of::<CarMotion>();
         let start = size_of::<Header>();
-        let mut offset = size_of::<Header>();
 
         for i in 1..22
         {
-            println!("Offset: {offset}");
+            let offsetStart = start + (i * size);
+            let offsetEnd   = start + (i * size) + size;
 
-            offset = start + (i * size);
+            println!("Offset: {offsetStart} .. {offsetEnd}");
+
+            cm[i] = CarMotion::unpack(&bytes[offsetStart..offsetEnd]);
         }
 
         cm

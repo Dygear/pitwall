@@ -20,13 +20,13 @@ fn main() {
         let (size, socketAddress) = socket.recv_from(&mut buffer).unwrap();
         println!("Got packet number {count} from {socketAddress} of size {size}.");
 
-        let mut header = packet::Header::unpack(&buffer);
+        let header = packet::Header::unpack(&buffer);
         
         match header.packetId {
             Some(packet::PacketId::Motion) => {
                 dbg!(packet::PacketMotion::unpack(&buffer));
             },
-            Some(x) => {
+            Some(_x) => {
                 dbg!(header);
                 println!("{} {:#?}", "Unhandled packetId".yellow(), header.packetId.unwrap());
             }
