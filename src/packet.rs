@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-use std::mem::{size_of, transmute};
 
 // https://answers.ea.com/t5/General-Discussion/F1-22-UDP-Specification/td-p/11551274
 
@@ -230,8 +229,17 @@ impl PacketMotion
 
     pub fn carMotion(bytes: &[u8]) -> [CarMotion; 22]
     {
-        let (head, body, _tail) = unsafe { bytes.align_to::<CarMotion>() };
-        body
+        use std::mem::size_of;
+
+        let cmSize = size_of::<CarMotion>();
+        let mut bOffset = size_of::<Header>();
+
+        for structWindow in &bytes[bOffset..cmSize]
+        {
+            // Yeah, I'm lost.
+        
+}
+
     }
 }
 
