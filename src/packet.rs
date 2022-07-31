@@ -1,13 +1,17 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+use std::mem::{size_of, transmute};
+
 // https://answers.ea.com/t5/General-Discussion/F1-22-UDP-Specification/td-p/11551274
 
 /**
  * # Packet Header
  * Each packet has the following header:
+ * Size: 24 Bytes
  */
 
+// Size: 24 Bytes
 #[derive(Debug, Clone, Copy)]
 pub struct Header
 {
@@ -91,53 +95,146 @@ impl PacketId {
  * Size: 1464 bytes
  * Version: 1
  */
+
+// Size: 60 Bytes
 #[derive(Debug, Clone, Copy)]
+#[repr(packed)]
 pub struct CarMotion
 {
-    pub worldPositionX: f32,                // World space X position
-    pub worldPositionY: f32,                // World space Y position
-    pub worldPositionZ: f32,                // World space Z position
-    pub worldVelocityX: f32,                // Velocity in world space X
-    pub worldVelocityY: f32,                // Velocity in world space Y
-    pub worldVelocityZ: f32,                // Velocity in world space Z
-    pub worldForwardDirX: i16,              // World space forward X direction (normalised)
-    pub worldForwardDirY: i16,              // World space forward Y direction (normalised)
-    pub worldForwardDirZ: i16,              // World space forward Z direction (normalised)
-    pub worldRightDirX: i16,                // World space right X direction (normalised)
-    pub worldRightDirY: i16,                // World space right Y direction (normalised)
-    pub worldRightDirZ: i16,                // World space right Z direction (normalised)
-    pub gForceLateral: f32,                 // Lateral G-Force component
-    pub gForceLongitudinal: f32,            // Longitudinal G-Force component
-    pub gForceVertical: f32,                // Vertical G-Force component
-    pub yaw: f32,                           // Yaw angle in radians
-    pub pitch: f32,                         // Pitch angle in radians
-    pub roll: f32,                          // Roll angle in radians
+    pub worldPositionX: f32,            // World space X position
+    pub worldPositionY: f32,            // World space Y position
+    pub worldPositionZ: f32,            // World space Z position
+    pub worldVelocityX: f32,            // Velocity in world space X
+    pub worldVelocityY: f32,            // Velocity in world space Y
+    pub worldVelocityZ: f32,            // Velocity in world space Z
+    pub worldForwardDirX: i16,          // World space forward X direction (normalised)
+    pub worldForwardDirY: i16,          // World space forward Y direction (normalised)
+    pub worldForwardDirZ: i16,          // World space forward Z direction (normalised)
+    pub worldRightDirX: i16,            // World space right X direction (normalised)
+    pub worldRightDirY: i16,            // World space right Y direction (normalised)
+    pub worldRightDirZ: i16,            // World space right Z direction (normalised)
+    pub gForceLateral: f32,             // Lateral G-Force component
+    pub gForceLongitudinal: f32,        // Longitudinal G-Force component
+    pub gForceVertical: f32,            // Vertical G-Force component
+    pub yaw: f32,                       // Yaw angle in radians
+    pub pitch: f32,                     // Pitch angle in radians
+    pub roll: f32,                      // Roll angle in radians
 }
 
+impl CarMotion
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            worldPositionX    : f32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
+            worldPositionY    : f32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
+            worldPositionZ    : f32::from_le_bytes([bytes[ 8], bytes[ 9], bytes[10], bytes[11]]),
+            worldVelocityX    : f32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
+            worldVelocityY    : f32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]),
+            worldVelocityZ    : f32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
+            worldForwardDirX  : i16::from_le_bytes([bytes[24], bytes[25]]),
+            worldForwardDirY  : i16::from_le_bytes([bytes[26], bytes[27]]),
+            worldForwardDirZ  : i16::from_le_bytes([bytes[28], bytes[29]]),
+            worldRightDirX    : i16::from_le_bytes([bytes[30], bytes[31]]),
+            worldRightDirY    : i16::from_le_bytes([bytes[32], bytes[33]]),
+            worldRightDirZ    : i16::from_le_bytes([bytes[34], bytes[35]]),
+            gForceLateral     : f32::from_le_bytes([bytes[36], bytes[37], bytes[38], bytes[39]]),
+            gForceLongitudinal: f32::from_le_bytes([bytes[40], bytes[41], bytes[42], bytes[43]]),
+            gForceVertical    : f32::from_le_bytes([bytes[44], bytes[45], bytes[46], bytes[47]]),
+            yaw               : f32::from_le_bytes([bytes[48], bytes[49], bytes[50], bytes[51]]),
+            pitch             : f32::from_le_bytes([bytes[52], bytes[53], bytes[54], bytes[55]]),
+            roll              : f32::from_le_bytes([bytes[56], bytes[57], bytes[58], bytes[59]]),
+        }
+    }
+}
+
+// Size: 
 #[derive(Debug, Clone, Copy)]
 pub struct PacketMotion
 {
-    pub header: Header,               // Header
+    pub header: Header,                     // Header
 
-    pub carMotion: [CarMotion; 22],   // Data for all cars on track
+    pub carMotion: [CarMotion; 22],         // Data for all cars on track
 
     // Extra player car ONLY data
-    pub suspensionPosition: [f32; 4],        // Note: All wheel arrays have the following order:
-    pub suspensionVelocity: [f32; 4],        // RL, RR, FL, FR
-    pub suspensionAcceleration: [f32; 4],    // RL, RR, FL, FR
-    pub wheelSpeed: [f32; 4],                // Speed of each wheel
-    pub wheelSlip: [f32; 4],                 // Slip ratio for each wheel
-    pub localVelocityX: f32,               // Velocity in local space
-    pub localVelocityY: f32,               // Velocity in local space
-    pub localVelocityZ: f32,               // Velocity in local space
-    pub angularVelocityX: f32,             // Angular velocity x-component
-    pub angularVelocityY: f32,             // Angular velocity y-component
-    pub angularVelocityZ: f32,             // Angular velocity z-component
-    pub angularAccelerationX: f32,         // Angular velocity x-component
-    pub angularAccelerationY: f32,         // Angular velocity y-component
-    pub angularAccelerationZ: f32,         // Angular velocity z-component
-    pub frontWheelsAngle: f32,             // Current front wheels angle in radians
+    pub suspensionPosition: [f32; 4],       // Note: All wheel arrays have the following order:
+    pub suspensionVelocity: [f32; 4],       // RL, RR, FL, FR
+    pub suspensionAcceleration: [f32; 4],   // RL, RR, FL, FR
+    pub wheelSpeed: [f32; 4],               // Speed of each wheel
+    pub wheelSlip: [f32; 4],                // Slip ratio for each wheel
+    pub localVelocityX: f32,                // Velocity in local space
+    pub localVelocityY: f32,                // Velocity in local space
+    pub localVelocityZ: f32,                // Velocity in local space
+    pub angularVelocityX: f32,              // Angular velocity x-component
+    pub angularVelocityY: f32,              // Angular velocity y-component
+    pub angularVelocityZ: f32,              // Angular velocity z-component
+    pub angularAccelerationX: f32,          // Angular velocity x-component
+    pub angularAccelerationY: f32,          // Angular velocity y-component
+    pub angularAccelerationZ: f32,          // Angular velocity z-component
+    pub frontWheelsAngle: f32,              // Current front wheels angle in radians
 }
+
+// Size: 1464 Bytes
+impl PacketMotion
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            header: Header::unpack(&bytes),
+
+            carMotion: Self::carMotion(&bytes),
+
+            // Extra player car ONLY data
+            suspensionPosition: [
+                f32::from_le_bytes([bytes[1344], bytes[1345], bytes[1346], bytes[1347]]),
+                f32::from_le_bytes([bytes[1348], bytes[1349], bytes[1350], bytes[1351]]),
+                f32::from_le_bytes([bytes[1352], bytes[1352], bytes[1353], bytes[1354]]),
+                f32::from_le_bytes([bytes[1356], bytes[1357], bytes[1358], bytes[1359]]),
+            ],
+            suspensionVelocity: [
+                f32::from_le_bytes([bytes[1360], bytes[1361], bytes[1362], bytes[1363]]),
+                f32::from_le_bytes([bytes[1364], bytes[1365], bytes[1366], bytes[1367]]),
+                f32::from_le_bytes([bytes[1368], bytes[1369], bytes[1370], bytes[1371]]),
+                f32::from_le_bytes([bytes[1372], bytes[1373], bytes[1374], bytes[1375]]),
+            ],
+            suspensionAcceleration: [
+                f32::from_le_bytes([bytes[1376], bytes[1377], bytes[1378], bytes[1379]]),
+                f32::from_le_bytes([bytes[1380], bytes[1381], bytes[1382], bytes[1383]]),
+                f32::from_le_bytes([bytes[1384], bytes[1385], bytes[1386], bytes[1387]]),
+                f32::from_le_bytes([bytes[1388], bytes[1389], bytes[1390], bytes[1391]]),
+            ],
+            wheelSpeed: [
+                f32::from_le_bytes([bytes[1392], bytes[1393], bytes[1394], bytes[1395]]),
+                f32::from_le_bytes([bytes[1396], bytes[1397], bytes[1398], bytes[1399]]),
+                f32::from_le_bytes([bytes[1400], bytes[1401], bytes[1402], bytes[1403]]),
+                f32::from_le_bytes([bytes[1404], bytes[1405], bytes[1406], bytes[1407]]),
+            ],
+            wheelSlip: [
+                f32::from_le_bytes([bytes[1408], bytes[1409], bytes[1410], bytes[1411]]),
+                f32::from_le_bytes([bytes[1412], bytes[1413], bytes[1414], bytes[1415]]),
+                f32::from_le_bytes([bytes[1416], bytes[1417], bytes[1418], bytes[1419]]),
+                f32::from_le_bytes([bytes[1420], bytes[1421], bytes[1422], bytes[1423]]),
+            ],
+            localVelocityX      : f32::from_le_bytes([bytes[1424], bytes[1425], bytes[1426], bytes[1427]]),
+            localVelocityY      : f32::from_le_bytes([bytes[1428], bytes[1429], bytes[1430], bytes[1431]]),
+            localVelocityZ      : f32::from_le_bytes([bytes[1432], bytes[1433], bytes[1434], bytes[1435]]),
+            angularVelocityX    : f32::from_le_bytes([bytes[1436], bytes[1437], bytes[1438], bytes[1439]]),
+            angularVelocityY    : f32::from_le_bytes([bytes[1440], bytes[1441], bytes[1442], bytes[1443]]),
+            angularVelocityZ    : f32::from_le_bytes([bytes[1444], bytes[1445], bytes[1446], bytes[1447]]),
+            angularAccelerationX: f32::from_le_bytes([bytes[1448], bytes[1449], bytes[1450], bytes[1451]]),
+            angularAccelerationY: f32::from_le_bytes([bytes[1452], bytes[1453], bytes[1454], bytes[1455]]),
+            angularAccelerationZ: f32::from_le_bytes([bytes[1456], bytes[1457], bytes[1458], bytes[1459]]),
+            frontWheelsAngle    : f32::from_le_bytes([bytes[1460], bytes[1461], bytes[1462], bytes[1463]]),
+        }
+    }
+
+    pub fn carMotion(bytes: &[u8]) -> [CarMotion; 22]
+    {
+        let (head, body, _tail) = unsafe { bytes.align_to::<CarMotion>() };
+        body
+    }
+}
+
 
 /**
  * # Session Packet
@@ -218,7 +315,7 @@ pub enum Temperature {
 #[derive(Debug, Clone, Copy)]
 pub struct PacketSession
 {
-    pub header: Header,           // Header
+    pub header: Header,                 // Header
 
     pub weather: Weather,
     pub trackTemperature: i8,           // Track temp. in degrees celsius
@@ -236,10 +333,10 @@ pub struct PacketSession
     pub spectatorCarIndex: u8,          // Index of the car being spectated
     pub sliProNativeSupport: u8,        // SLI Pro support, 0 = inactive, 1 = active
     pub numMarshalZones: u8,            // Number of marshal zones to follow
-    pub marshalZones: [MarshalZone; 21],  // List of marshal zones – max 21
+    pub marshalZones: [MarshalZone; 21],// List of marshal zones – max 21
     pub safetyCarStatus: SafetyCar,
     pub networkGame: u8,                // 0 = offline, 1 = online
-    pub numWeatherForecasts: u8,  // Number of weather samples to follow
+    pub numWeatherForecasts: u8,        // Number of weather samples to follow
     pub weatherForecastSamples: [WeatherForecast; 56], // Array of weather forecast samples
     pub forecastAccuracy: u8,           // 0 = Perfect, 1 = Approximate
     pub aiDifficulty: u8,               // AI Difficulty rating – 0-110

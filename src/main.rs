@@ -2,6 +2,7 @@
 
 use std::net::UdpSocket;
 use prctl::set_name;
+use colored::*;
 
 mod packet;
 
@@ -17,9 +18,22 @@ fn main() {
     {
         count += 1;
         let (size, socketAddress) = socket.recv_from(&mut buffer).unwrap();
-        let packet: packet::Header = packet::Header::unpack(&buffer);
-
         println!("Got packet number {count} from {socketAddress} of size {size}.");
-        dbg!(packet);
+
+        let mut header = packet::Header::unpack(&buffer);
+        
+        match header.packetId {
+            Some(packet::PacketId::Motion) => {
+                dbg!(packet::PacketMotion::unpack(&buffer));
+            },
+            Some(x) => {
+                dbg!(header);
+                println!("{} {:#?}", "Unhandled packetId".yellow(), header.packetId.unwrap());
+            }
+            None => {
+                dbg!(header);
+                println!("{} {:#?}", "Unknown PacketId".red(), header.packetId.unwrap());
+            }
+        };
     }
 }
