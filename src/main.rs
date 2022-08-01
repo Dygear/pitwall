@@ -1,6 +1,14 @@
 #![allow(non_snake_case)]
+#![allow(unused_imports)]
 
-use std::net::UdpSocket;
+use std::{
+    mem::{
+        size_of
+    },
+    net::{
+        UdpSocket
+    }
+};
 use prctl::set_name;
 use colored::*;
 
@@ -24,7 +32,12 @@ fn main() {
         
         match header.packetId {
             Some(packet::PacketId::Lap) => {
-                dbg!(packet::PacketLap::unpack(&buffer));
+//                let lapPack = packet::PacketLap::unpack(&buffer);
+//                dbg!(lapPack);
+            }
+            Some(packet::PacketId::Participants) => {
+                let participantsPack = packet::PacketParticipants::unpack(&buffer);
+                dbg!(participantsPack);
             }
             Some(_x) => {
                 println!("{} {:#?}", "Unhandled packetId".yellow(), header.packetId.unwrap());

@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 use std::mem::size_of;
+use std::fmt;
 
 // https://answers.ea.com/t5/General-Discussion/F1-22-UDP-Specification/td-p/11551274
 
@@ -422,7 +423,7 @@ pub enum SessionLength {
  * Version: 1
  */
 
-// 43
+#[repr(C, packed)] // Size: 43 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Lap
 {
@@ -466,7 +467,7 @@ impl Lap
             safetyCarDelta             : f32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
             carPosition                : bytes[24],
             currentLapNum              : bytes[25],
-            pitStatus                  : PitStatus::unpack(bytes[26]),
+            pitStatus                  : PitStatus::from_u8(bytes[26]),
             numPitStops                : bytes[27],
             sector                     : bytes[28],
             currentLapInvalid          : bytes[29],
@@ -475,8 +476,8 @@ impl Lap
             numUnservedDriveThroughPens: bytes[32],
             numUnservedStopGoPens      : bytes[33],
             gridPosition               : bytes[34],
-            driverStatus               : Driver::unpack(bytes[35]),
-            resultStatus               : ResultStatus::unpack(bytes[36]),
+            driverStatus               : Driver::from_u8(bytes[35]),
+            resultStatus               : ResultStatus::from_u8(bytes[36]),
             pitLaneTimerActive         : bytes[37],
             pitLaneTimeInLaneInMS      : u16::from_le_bytes([bytes[38], bytes[39]]),
             pitStopTimerInMS           : u16::from_le_bytes([bytes[40], bytes[41]]),
@@ -496,7 +497,7 @@ pub enum PitStatus {
 
 impl PitStatus
 {
-    pub fn unpack(byte: u8) -> Option<Self>
+    pub fn from_u8(byte: u8) -> Option<Self>
     {
         match byte
         {
@@ -520,7 +521,7 @@ pub enum Driver {
 }
 
 impl Driver {
-    pub fn unpack(byte: u8) -> Option<Self>
+    pub fn from_u8(byte: u8) -> Option<Self>
     {
         match byte
         {
@@ -549,7 +550,7 @@ pub enum ResultStatus {
 }
 
 impl ResultStatus {
-    pub fn unpack(byte: u8) -> Option<Self>
+    pub fn from_u8(byte: u8) -> Option<Self>
     {
         match byte
         {
@@ -566,7 +567,7 @@ impl ResultStatus {
     }
 }
 
-
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketLap
 {
@@ -603,9 +604,6 @@ impl PacketLap
         {
             let offsetStart = start + (i * size);
             let offsetEnd   = start + (i * size) + size;
-
-            println!("I: {i} Size: {size} & Start: {start}");
-            println!("Offset: {offsetStart} .. {offsetEnd}");
 
             l[i] = Lap::unpack(&bytes[offsetStart..offsetEnd]);
         }
@@ -889,8 +887,9 @@ pub enum EventStringCode
  * Size: 1257 bytes
  * Version: 1
  */
-#[derive(Debug, Clone, Copy)]
-pub struct Participant<'a>
+#[repr(C, packed)] // Size: 57 Bytes
+#[derive(Clone, Copy)]
+pub struct Participant
 {
     pub aiControlled: u8,       // Whether the vehicle is AI (1) or Human (0) controlled
     pub driverId: u8,           // Driver id - see appendix, 255 if network human
@@ -899,17 +898,109 @@ pub struct Participant<'a>
     pub myTeam: u8,             // My team flag – 1 = My Team, 0 = otherwise
     pub raceNumber: u8,         // Race number of the car
     pub nationality: u8,        // Nationality of the driver
-    pub name: [&'a str; 48],    // Name of participant in UTF-8 format – null terminated Will be truncated with … (U+2026) if too long
+    pub name: [u8; 48],         // Name of participant in UTF-8 format – null terminated Will be truncated with … (U+2026) if too long
     pub yourTelemetry: u8,      // The player's UDP setting, 0 = restricted, 1 = public
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct PacketParticipantsData<'a>
+impl Participant
 {
-    pub header: Header,   // Header
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            aiControlled: bytes[0],
+            driverId: bytes[1],
+            networkId: bytes[2],
+            teamId: bytes[3],
+            myTeam: bytes[4],
+            raceNumber: bytes[5],
+            nationality: bytes[6],
+            name: match bytes[7..55].try_into()
+                    {
+                        Ok(str) => str,
+                        Err(err) => {
+                            dbg!(err);
+                            [0; 48]
+                        }
+                    },
+            yourTelemetry: bytes[55]
+        }
+    }
+}
+
+impl Default for Participant
+{
+    fn default() -> Self
+    {
+        Self {
+            aiControlled: 0,
+            driverId: 0,
+            networkId: 0,
+            teamId: 0,
+            myTeam: 0,
+            raceNumber: 0,
+            nationality: 0,
+            name: [0; 48],
+            yourTelemetry: 0
+        }
+    }
+}
+
+impl fmt::Debug for Participant
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Participant")
+         .field( "aiControlled", &self.aiControlled)
+         .field(     "driverId", &self.driverId)
+         .field(    "networkId", &self.networkId)
+         .field(       "teamId", &self.teamId)
+         .field(       "myTeam", &self.myTeam)
+         .field(   "raceNumber", &self.raceNumber)
+         .field(  "nationality", &self.nationality)
+         .field(         "name", &std::str::from_utf8(&self.name).unwrap().trim_end_matches('\0'))
+         .field("yourTelemetry", &self.yourTelemetry)
+         .finish()
+    }
+}
+
+#[repr(C, packed)] // 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct PacketParticipants
+{
+    pub header: Header,     // Header
 
     pub numActiveCars: u8,      // Number of active cars in the data – should match number of cars on HUD
-    pub participants: [Participant<'a>; 22],
+    pub participants: [Participant; 22],
+}
+
+impl<'a> PacketParticipants
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            header: Header::unpack(&bytes),
+
+            numActiveCars: bytes[25],
+            participants: Self::participants(&bytes),
+        }
+    }
+
+    pub fn participants(bytes: &[u8]) -> [Participant; 22]
+    {
+        let mut p = [Participant::default(); 22];
+
+        let size = size_of::<Participant>();
+        let start = size_of::<Header>() + 1;
+
+        for i in 0..22
+        {
+            let offsetStart = start + (i * size);
+            let offsetEnd   = start + (i * size) + size;
+
+            p[i] = Participant::unpack(&bytes[offsetStart..offsetEnd]);
+        }
+
+        p
+    }
 }
 
 /**
