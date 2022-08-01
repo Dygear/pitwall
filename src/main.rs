@@ -29,6 +29,9 @@ fn main() {
             Some(packet::PacketId::SessionHistory) => {
                 dbg!(packet::PacketSessionHistory::unpack(&buffer));
             }
+            Some(packet::PacketId::Lap) => {
+                dbg!(packet::PacketLap::unpack(&buffer));
+            }
             Some(_x) => {
                 dbg!(header);
                 println!("{} {:#?}", "Unhandled packetId".yellow(), header.packetId.unwrap());

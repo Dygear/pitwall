@@ -55,7 +55,7 @@ pub enum PacketId {
     #[default]
     Motion = 0,                         // Contains all motion data for player’s car – only sent while player is in control
     Session = 1,                        // Data about the session – track, time left
-    LapData = 2,                        // Data about all the lap times of cars in the session
+    Lap = 2,                            // Data about all the lap times of cars in the session
     Event = 3,                          // Various notable events that happen during a session
     Participants = 4,                   // List of participants in the session, mostly relevant for multiplayer
     CarSetups = 5,                      // Packet detailing car setups for cars in the race
@@ -72,7 +72,7 @@ impl PacketId {
         match value {
             0 => Some(PacketId::Motion),
             1 => Some(PacketId::Session),
-            2 => Some(PacketId::LapData),
+            2 => Some(PacketId::Lap),
             3 => Some(PacketId::Event),
             4 => Some(PacketId::Participants),
             5 => Some(PacketId::CarSetups),
@@ -351,11 +351,11 @@ pub struct PacketSession
     pub spectatorCarIndex: u8,          // Index of the car being spectated
     pub sliProNativeSupport: u8,        // SLI Pro support, 0 = inactive, 1 = active
     pub numMarshalZones: u8,            // Number of marshal zones to follow
-    pub marshalZones: [MarshalZone; 21],// List of marshal zones – max 21
+    pub marshalZones: [MarshalZone; 21],// 21x (1x f32 + 1x u8) List of marshal zones – max 21
     pub safetyCarStatus: SafetyCar,     // u8
     pub networkGame: u8,                // 0 = offline, 1 = online
     pub numWeatherForecasts: u8,        // Number of weather samples to follow
-    pub weatherForecastSamples: [WeatherForecast; 56], // Array of weather forecast samples
+    pub weatherForecastSamples: [WeatherForecast; 56], // 56x 8x u8 - of weather forecast samples
     pub forecastAccuracy: u8,           // 0 = Perfect, 1 = Approximate
     pub aiDifficulty: u8,               // AI Difficulty rating – 0-110
     pub seasonLinkIdentifier: u32,      // Identifier for season - persists across saves
@@ -435,7 +435,7 @@ pub struct Lap
     pub safetyCarDelta: f32,                // Delta in seconds for safety car
     pub carPosition: u8,                    // Car race position
     pub currentLapNum: u8,                  // Current lap number
-    pub pitStatus: PitStatus,
+    pub pitStatus: Option<PitStatus>,        // u8
     pub numPitStops: u8,                    // Number of pit stops taken in this race
     pub sector: u8,                         // 0 = sector1, 1 = sector2, 2 = sector3
     pub currentLapInvalid: u8,              // Current lap invalid - 0 = valid, 1 = invalid
@@ -444,12 +444,45 @@ pub struct Lap
     pub numUnservedDriveThroughPens: u8,    // Num drive through pens left to serve
     pub numUnservedStopGoPens: u8,          // Num stop go pens left to serve
     pub gridPosition: u8,                   // Grid position the vehicle started the race in
-    pub driverStatus: Driver,
-    pub resultStatus: ResultStatus,
+    pub driverStatus: Option<Driver>,       // u8
+    pub resultStatus: Option<ResultStatus>, // u8
     pub pitLaneTimerActive: u8,             // Pit lane timing, 0 = inactive, 1 = active
     pub pitLaneTimeInLaneInMS: u16,         // If active, the current time spent in the pit lane in ms
     pub pitStopTimerInMS: u16,              // Time of the actual pit stop in ms
     pub pitStopShouldServePen: u8,          // Whether the car should serve a penalty at this stop
+}
+
+impl Lap
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            lastLapTimeInMS            : u32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
+            currentLapTimeInMS         : u32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
+            sector1TimeInMS            : u16::from_le_bytes([bytes[ 8], bytes[ 9]]),
+            sector2TimeInMS            : u16::from_le_bytes([bytes[10], bytes[11]]),
+            lapDistance                : f32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
+            totalDistance              : f32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]),
+            safetyCarDelta             : f32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
+            carPosition                : bytes[24],
+            currentLapNum              : bytes[25],
+            pitStatus                  : PitStatus::unpack(bytes[26]),
+            numPitStops                : bytes[27],
+            sector                     : bytes[28],
+            currentLapInvalid          : bytes[29],
+            penalties                  : bytes[30],
+            warnings                   : bytes[31],
+            numUnservedDriveThroughPens: bytes[32],
+            numUnservedStopGoPens      : bytes[33],
+            gridPosition               : bytes[34],
+            driverStatus               : Driver::unpack(bytes[35]),
+            resultStatus               : ResultStatus::unpack(bytes[36]),
+            pitLaneTimerActive         : bytes[37],
+            pitLaneTimeInLaneInMS      : u16::from_le_bytes([bytes[38], bytes[39]]),
+            pitStopTimerInMS           : u16::from_le_bytes([bytes[40], bytes[41]]),
+            pitStopShouldServePen      : bytes[42],
+        }
+    }
 }
 
 #[repr(u8)]
@@ -461,6 +494,20 @@ pub enum PitStatus {
     InPitArea = 2,
 }
 
+impl PitStatus
+{
+    pub fn unpack(byte: u8) -> Option<Self>
+    {
+        match byte
+        {
+            0 => Some(PitStatus::None),
+            1 => Some(PitStatus::Pitting),
+            2 => Some(PitStatus::InPitArea),
+            _ => None
+        }
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Driver {
@@ -470,6 +517,21 @@ pub enum Driver {
     InLap = 2,
     OutLap = 3,
     OnTrack = 4,
+}
+
+impl Driver {
+    pub fn unpack(byte: u8) -> Option<Self>
+    {
+        match byte
+        {
+            0 => Some(Driver::InGarage),
+            1 => Some(Driver::OnFlyingLap),
+            2 => Some(Driver::InLap),
+            3 => Some(Driver::OutLap),
+            4 => Some(Driver::OnTrack),
+            _ => None
+        }
+    }
 }
 
 #[repr(u8)]
@@ -486,6 +548,25 @@ pub enum ResultStatus {
     Retired = 7,
 }
 
+impl ResultStatus {
+    pub fn unpack(byte: u8) -> Option<Self>
+    {
+        match byte
+        {
+            0 => Some(ResultStatus::Invalid),
+            1 => Some(ResultStatus::Inactive),
+            2 => Some(ResultStatus::Active),
+            3 => Some(ResultStatus::Finished),
+            4 => Some(ResultStatus::DidNotFinish),
+            5 => Some(ResultStatus::Disqualified),
+            6 => Some(ResultStatus::NotClassified),
+            7 => Some(ResultStatus::Retired),
+            _ => None
+        }
+    }
+}
+
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketLap
 {
@@ -495,6 +576,41 @@ pub struct PacketLap
 
     pub timeTrialPBCarIdx: u8,          // Index of Personal Best car in time trial (255 if invalid)
     pub timeTrialRivalCarIdx: u8,       // Index of Rival car in time trial (255 if invalid)
+}
+
+impl PacketLap
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            header: Header::unpack(&bytes),
+
+            laps: Self::lap(&bytes),
+
+            timeTrialPBCarIdx: bytes[971],
+            timeTrialRivalCarIdx: bytes[972],
+        }
+    }
+
+    pub fn lap(bytes: &[u8]) -> [Lap; 22]
+    {
+        let mut l = [Lap::default(); 22];
+
+        let size = size_of::<Lap>();
+        let start = size_of::<Header>();
+
+        for i in 1..22
+        {
+            let offsetStart = start + (i * size);
+            let offsetEnd   = start + (i * size) + size;
+
+            println!("Offset: {offsetStart} .. {offsetEnd}");
+
+            l[i] = Lap::unpack(&bytes[offsetStart..offsetEnd]);
+        }
+
+        l
+    }
 }
 
 /**
@@ -536,7 +652,7 @@ impl FastestLap
     {
         Self {
             vehicleIdx: bytes[0],
-            lapTime: f32::from_le_bytes([bytes[2], bytes[3], bytes[4], bytes[5]]),
+            lapTime: f32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]),
         }
     }
 }
