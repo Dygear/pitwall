@@ -32,8 +32,8 @@ fn main() {
         
         match header.packetId {
             Some(packet::PacketId::Lap) => {
-//                let lapPack = packet::PacketLap::unpack(&buffer);
-//                dbg!(lapPack);
+                let lapPack = packet::PacketLap::unpack(&buffer);
+                dbg!(lapPack);
             }
             Some(packet::PacketId::Participants) => {
                 let participantsPack = packet::PacketParticipants::unpack(&buffer);

@@ -256,11 +256,23 @@ impl PacketMotion
  * Size: 632 bytes
  * Version: 1
  */
+#[repr(C, packed)] // Size: 105 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MarshalZone
 {
     pub zoneStart: f32,                // Fraction (0..1) of way through the lap the marshal zone starts
     pub zoneFlag: ZoneFlag,
+}
+
+impl MarshalZone
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            zoneStart: f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            zoneFlag: ZoneFlag::from_u8_to_i8(&bytes[4]),
+        }
+    }
 }
 
 #[repr(i8)]
@@ -275,6 +287,24 @@ pub enum ZoneFlag {
     Red = 4,
 }
 
+impl ZoneFlag
+{
+    pub fn from_u8_to_i8(byte: &u8) -> Self
+    {
+        match *byte as i8
+        {
+           -1 => ZoneFlag::Invalid,
+            0 => ZoneFlag::None,
+            1 => ZoneFlag::Green,
+            2 => ZoneFlag::Blue,
+            3 => ZoneFlag::Yellow,
+            4 => ZoneFlag::Red,
+            _ => ZoneFlag::Invalid,
+        }
+    }
+}
+
+#[repr(C, packed)] // Size: 448 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct WeatherForecast
 {
@@ -286,6 +316,23 @@ pub struct WeatherForecast
     pub airTemperature: i8,                 // Air temp. in degrees celsius
     pub airTemperatureChange: Temperature,  // i8
     pub rainPercentage: u8,                 // Rain percentage (0-100)
+}
+
+impl WeatherForecast
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            sessionType: Session::from_u8(&bytes[0]),
+            timeOffset: bytes[1],
+            weather: Weather::from_u8(&bytes[2]),
+            trackTemperature: bytes[3] as i8,
+            trackTemperatureChange: Temperature::from_u8(&bytes[4]),
+            airTemperature: bytes[5] as i8,
+            airTemperatureChange: Temperature::from_u8(&bytes[6]),
+            rainPercentage: bytes[7],
+        }
+    }
 }
 
 #[repr(u8)]
@@ -308,6 +355,31 @@ pub enum Session {
     TimeTrial = 13,
 }
 
+impl Session
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => Session::Unknown,
+            1 => Session::Practice1,
+            2 => Session::Practice2,
+            3 => Session::Practice3,
+            4 => Session::ShortPractice,
+            5 => Session::Quali1,
+            6 => Session::Quali2,
+            7 => Session::Quali3,
+            8 => Session::ShortQuli,
+            9 => Session::OneShotQuli,
+            10=> Session::Race,
+            11=> Session::Race2,
+            12=> Session::Race3,
+            13=> Session::TimeTrial,
+            _ => Session::Unknown,
+        }
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Weather {
@@ -320,6 +392,23 @@ pub enum Weather {
     RainStorm = 5
 }
 
+impl Weather
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => Weather::Clear,
+            1 => Weather::LightCloud,
+            2 => Weather::Overcast,
+            3 => Weather::RainLight,
+            4 => Weather::RainHeavy,
+            5 => Weather::RainStorm,
+            _ => Weather::Clear,
+        }
+    }
+}
+
 #[repr(i8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Temperature {
@@ -329,6 +418,21 @@ pub enum Temperature {
     None = 2
 }
 
+impl Temperature
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => Temperature::Up,
+            1 => Temperature::Down,
+            2 => Temperature::None,
+            _ => Temperature::None,
+        }
+    }
+}
+
+#[repr(C, packed)] // Size: 632 Bytes
 #[derive(Debug, Clone, Copy)]
 pub struct PacketSession
 {
@@ -348,14 +452,14 @@ pub struct PacketSession
     pub gamePaused: u8,                 // Whether the game is paused – network game only
     pub isSpectating: u8,               // Whether the player is spectating
     pub spectatorCarIndex: u8,          // Index of the car being spectated
-    pub sliProNativeSupport: u8,        // SLI Pro support, 0 = inactive, 1 = active
+    pub sliProNativeSupport: SLIPro,    // SLI Pro support, 0 = inactive, 1 = active
     pub numMarshalZones: u8,            // Number of marshal zones to follow
-    pub marshalZones: [MarshalZone; 21],// 21x (1x f32 + 1x u8) List of marshal zones – max 21
+    pub marshalZones: [MarshalZone; 21],// 105 Bytes - List of marshal zones – max 21
     pub safetyCarStatus: SafetyCar,     // u8
-    pub networkGame: u8,                // 0 = offline, 1 = online
+    pub networkGame: NetworkGame,       // 0 = offline, 1 = online
     pub numWeatherForecasts: u8,        // Number of weather samples to follow
-    pub weatherForecastSamples: [WeatherForecast; 56], // 56x 8x u8 - of weather forecast samples
-    pub forecastAccuracy: u8,           // 0 = Perfect, 1 = Approximate
+    pub weatherForecastSamples: [WeatherForecast; 56], // 448 Bytes - of weather forecast samples
+    pub forecastAccuracy: Accuracy,     // 0 = Perfect, 1 = Approximate
     pub aiDifficulty: u8,               // AI Difficulty rating – 0-110
     pub seasonLinkIdentifier: u32,      // Identifier for season - persists across saves
     pub weekendLinkIdentifier: u32,     // Identifier for weekend - persists across saves
@@ -363,19 +467,106 @@ pub struct PacketSession
     pub pitStopWindowIdealLap: u8,      // Ideal lap to pit on for current strategy (player)
     pub pitStopWindowLatestLap: u8,     // Latest lap to pit on for current strategy (player)
     pub pitStopRejoinPosition: u8,      // Predicted position to rejoin at (player)
-    pub steeringAssist: u8,             // 0 = off, 1 = on
+    pub steeringAssist: Assist,         // 0 = off, 1 = on
     pub brakingAssist: u8,              // 0 = off, 1 = low, 2 = medium, 3 = high
     pub gearboxAssist: u8,              // 1 = manual, 2 = manual & suggested gear, 3 = auto
-    pub pitAssist: u8,                  // 0 = off, 1 = on
-    pub pitReleaseAssist: u8,           // 0 = off, 1 = on
-    pub ERSAssist: u8,                  // 0 = off, 1 = on
-    pub DRSAssist: u8,                  // 0 = off, 1 = on
+    pub pitAssist: Assist,              // 0 = off, 1 = on
+    pub pitReleaseAssist: Assist,       // 0 = off, 1 = on
+    pub ERSAssist: Assist,              // 0 = off, 1 = on
+    pub DRSAssist: Assist,              // 0 = off, 1 = on
     pub dynamicRacingLine: u8,          // 0 = off, 1 = corners only, 2 = full
     pub dynamicRacingLineType: u8,      // 0 = 2D, 1 = 3D
     pub gameMode: u8,                   // Game mode id - see appendix
     pub ruleSet: u8,                    // Ruleset - see appendix
     pub timeOfDay: u32,                 // Local time of day - minutes since midnight
     pub sessionLength: SessionLength,   // u8
+}
+
+impl PacketSession
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            header                : Header::unpack(&bytes),
+
+            weather               : Weather::from_u8(&bytes[25]),
+            trackTemperature      : bytes[26] as i8,
+            airTemperature        : bytes[27] as i8,
+            totalLaps             : bytes[28],
+            trackLength           : u16::from_le_bytes([bytes[29], bytes[30]]),
+            sessionType           : Session::from_u8(&bytes[31]),
+            trackId               : bytes[32] as i8,
+            formula               : Formula::from_u8(&bytes[33]),
+            sessionTimeLeft       : u16::from_le_bytes([bytes[34], bytes[35]]),
+            sessionDuration       : u16::from_le_bytes([bytes[36], bytes[37]]),
+            pitSpeedLimit         : bytes[38],
+            gamePaused            : bytes[39],
+            isSpectating          : bytes[40],
+            spectatorCarIndex     : bytes[41],
+            sliProNativeSupport   : SLIPro::from_u8(&bytes[42]),
+            numMarshalZones       : bytes[43],
+            marshalZones          : Self::marshalZone(&bytes[44..149]),
+            safetyCarStatus       : SafetyCar::from_u8(&bytes[149]),
+            networkGame           : NetworkGame::from_u8(&bytes[150]),
+            numWeatherForecasts   : bytes[151],
+            weatherForecastSamples: Self::weatherForecast(&bytes[152..600]),
+            forecastAccuracy      : Accuracy::from_u8(&bytes[600]),
+            aiDifficulty          : bytes[601],
+            seasonLinkIdentifier  : u32::from_le_bytes([bytes[602], bytes[603], bytes[604], bytes[605]]),
+            weekendLinkIdentifier : u32::from_le_bytes([bytes[606], bytes[607], bytes[608], bytes[609]]),
+            sessionLinkIdentifier : u32::from_le_bytes([bytes[610], bytes[611], bytes[612], bytes[613]]),
+            pitStopWindowIdealLap : bytes[614],
+            pitStopWindowLatestLap: bytes[615],
+            pitStopRejoinPosition : bytes[616],
+            steeringAssist        : Assist::from_u8(&bytes[617]),
+            brakingAssist         : bytes[618],
+            gearboxAssist         : bytes[619],
+            pitAssist             : Assist::from_u8(&bytes[620]),
+            pitReleaseAssist      : Assist::from_u8(&bytes[621]),
+            ERSAssist             : Assist::from_u8(&bytes[622]),
+            DRSAssist             : Assist::from_u8(&bytes[623]),
+            dynamicRacingLine     : bytes[624],
+            dynamicRacingLineType : bytes[625],
+            gameMode              : bytes[626],
+            ruleSet               : bytes[627],
+            timeOfDay             : u32::from_le_bytes([bytes[628], bytes[629], bytes[630], bytes[631]]),
+            sessionLength         : SessionLength::from_u8(&bytes[632]),
+        }
+    }
+
+    pub fn marshalZone(bytes: &[u8]) -> [MarshalZone; 21]
+    {
+        let mut mz = [MarshalZone::default(); 21];
+
+        let size = size_of::<MarshalZone>();
+
+        for i in 0..21
+        {
+            let start = i * size;
+            let end = start + size;
+
+            mz[i] = MarshalZone::unpack(&bytes[start..end]);
+        }
+
+        mz
+    }
+
+    pub fn weatherForecast(bytes: &[u8]) -> [WeatherForecast; 56]
+    {
+        let mut wf = [WeatherForecast::default(); 56];
+
+        let size = size_of::<WeatherForecast>();
+
+        for i in 0..56
+        {
+            let start = i * size;
+            let end = start + size;
+
+            wf[i] = WeatherForecast::unpack(&bytes[start..end]);
+        }
+
+        wf
+    }
 }
 
 #[repr(u8)]
@@ -392,6 +583,108 @@ pub enum Formula {
     Formula22021 = 7
 }
 
+impl Formula
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => Formula::Modern,
+            1 => Formula::Classic,
+            2 => Formula::Formula2,
+            3 => Formula::Generic,
+            4 => Formula::Beta,
+            5 => Formula::Supercars,
+            6 => Formula::Esports,
+            7 => Formula::Formula22021,
+            _ => Formula::Modern,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Default, Clone, Copy)]
+pub enum SLIPro {
+    #[default]
+    Inactive = 0,
+    Active = 1,
+}
+
+impl SLIPro
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => SLIPro::Inactive,
+            1 => SLIPro::Active,
+            _ => SLIPro::Inactive,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Default, Clone, Copy)]
+pub enum NetworkGame {
+    #[default]
+    Offline = 0,
+    Online = 1,
+}
+
+impl NetworkGame
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => NetworkGame::Offline,
+            1 => NetworkGame::Online,
+            _ => NetworkGame::Offline,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Default, Clone, Copy)]
+pub enum Accuracy {
+    #[default]
+    Perfect = 0,
+    Approximate = 1,
+}
+
+impl Accuracy {
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => Accuracy::Perfect,
+            1 => Accuracy::Approximate,
+            _ => Accuracy::Perfect,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Default, Clone, Copy)]
+pub enum Assist {
+    #[default]
+    Off = 0,
+    On = 1,
+}
+
+impl Assist
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => Assist::Off,
+            1 => Assist::On,
+            _ => Assist::Off
+        }
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum SafetyCar {
@@ -400,6 +693,21 @@ pub enum SafetyCar {
     Deployed = 1,
     Virtual = 2,
     FormationLap = 3,
+}
+
+impl SafetyCar
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => SafetyCar::Ready,
+            1 => SafetyCar::Deployed,
+            2 => SafetyCar::Virtual,
+            3 => SafetyCar::FormationLap,
+            _ => SafetyCar::Ready,
+        }
+    }
 }
 
 #[repr(u8)]
@@ -413,6 +721,24 @@ pub enum SessionLength {
     MediumLong = 5,
     Long = 6,
     Full = 7
+}
+
+impl SessionLength
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => SessionLength::None,
+            2 => SessionLength::VeryShort,
+            3 => SessionLength::Short,
+            4 => SessionLength::Medium,
+            5 => SessionLength::MediumLong,
+            6 => SessionLength::Long,
+            7 => SessionLength::Full,
+            _ => SessionLength::None,
+        }
+    }
 }
 
 /**
@@ -436,7 +762,7 @@ pub struct Lap
     pub safetyCarDelta: f32,                // Delta in seconds for safety car
     pub carPosition: u8,                    // Car race position
     pub currentLapNum: u8,                  // Current lap number
-    pub pitStatus: Option<PitStatus>,        // u8
+    pub pitStatus: PitStatus,               // u8
     pub numPitStops: u8,                    // Number of pit stops taken in this race
     pub sector: u8,                         // 0 = sector1, 1 = sector2, 2 = sector3
     pub currentLapInvalid: u8,              // Current lap invalid - 0 = valid, 1 = invalid
@@ -445,8 +771,8 @@ pub struct Lap
     pub numUnservedDriveThroughPens: u8,    // Num drive through pens left to serve
     pub numUnservedStopGoPens: u8,          // Num stop go pens left to serve
     pub gridPosition: u8,                   // Grid position the vehicle started the race in
-    pub driverStatus: Option<Driver>,       // u8
-    pub resultStatus: Option<ResultStatus>, // u8
+    pub driverStatus: Driver,               // u8
+    pub resultStatus: ResultStatus,         // u8
     pub pitLaneTimerActive: u8,             // Pit lane timing, 0 = inactive, 1 = active
     pub pitLaneTimeInLaneInMS: u16,         // If active, the current time spent in the pit lane in ms
     pub pitStopTimerInMS: u16,              // Time of the actual pit stop in ms
@@ -497,14 +823,14 @@ pub enum PitStatus {
 
 impl PitStatus
 {
-    pub fn from_u8(byte: u8) -> Option<Self>
+    pub fn from_u8(byte: u8) -> Self
     {
         match byte
         {
-            0 => Some(PitStatus::None),
-            1 => Some(PitStatus::Pitting),
-            2 => Some(PitStatus::InPitArea),
-            _ => None
+            0 => PitStatus::None,
+            1 => PitStatus::Pitting,
+            2 => PitStatus::InPitArea,
+            _ => PitStatus::None,
         }
     }
 }
@@ -521,16 +847,16 @@ pub enum Driver {
 }
 
 impl Driver {
-    pub fn from_u8(byte: u8) -> Option<Self>
+    pub fn from_u8(byte: u8) -> Self
     {
         match byte
         {
-            0 => Some(Driver::InGarage),
-            1 => Some(Driver::OnFlyingLap),
-            2 => Some(Driver::InLap),
-            3 => Some(Driver::OutLap),
-            4 => Some(Driver::OnTrack),
-            _ => None
+            0 => Driver::InGarage,
+            1 => Driver::OnFlyingLap,
+            2 => Driver::InLap,
+            3 => Driver::OutLap,
+            4 => Driver::OnTrack,
+            _ => Driver::InGarage,
         }
     }
 }
@@ -550,19 +876,19 @@ pub enum ResultStatus {
 }
 
 impl ResultStatus {
-    pub fn from_u8(byte: u8) -> Option<Self>
+    pub fn from_u8(byte: u8) -> Self
     {
         match byte
         {
-            0 => Some(ResultStatus::Invalid),
-            1 => Some(ResultStatus::Inactive),
-            2 => Some(ResultStatus::Active),
-            3 => Some(ResultStatus::Finished),
-            4 => Some(ResultStatus::DidNotFinish),
-            5 => Some(ResultStatus::Disqualified),
-            6 => Some(ResultStatus::NotClassified),
-            7 => Some(ResultStatus::Retired),
-            _ => None
+            0 => ResultStatus::Invalid,
+            1 => ResultStatus::Inactive,
+            2 => ResultStatus::Active,
+            3 => ResultStatus::Finished,
+            4 => ResultStatus::DidNotFinish,
+            5 => ResultStatus::Disqualified,
+            6 => ResultStatus::NotClassified,
+            7 => ResultStatus::Retired,
+            _ => ResultStatus::Invalid,
         }
     }
 }
@@ -586,7 +912,7 @@ impl PacketLap
         Self {
             header: Header::unpack(&bytes),
 
-            laps: Self::lap(&bytes),
+            laps: Self::lap(&bytes[24..size_of::<Header>()+size_of::<Lap>()*22]),
 
             timeTrialPBCarIdx: bytes[970],
             timeTrialRivalCarIdx: bytes[971],
@@ -748,12 +1074,12 @@ impl SpeedTrap
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            vehicleIdx: bytes[0],
-            speed: f32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]),
-            isOverallFastestInSession: bytes[5],
-            isDriverFastestInSession: bytes[6],
-            fastestVehicleIdxInSession: bytes[7],
-            fastestSpeedInSession: f32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
+            vehicleIdx                : bytes[ 0],
+            speed                     : f32::from_le_bytes([bytes[ 1], bytes[ 2], bytes[ 3], bytes[ 4]]),
+            isOverallFastestInSession : bytes[ 5],
+            isDriverFastestInSession  : bytes[ 6],
+            fastestVehicleIdxInSession: bytes[ 7],
+            fastestSpeedInSession     : f32::from_le_bytes([bytes[ 8], bytes[ 9], bytes[10], bytes[11]]),
         }
     }
 }
@@ -821,7 +1147,7 @@ impl Flashback
     {
         Self {
             flashbackFrameIdentifier: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
-            flashbackSessionTime: f32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            flashbackSessionTime    : f32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
         }
     }
 }
@@ -843,11 +1169,11 @@ impl Buttons
 }
 
 #[derive(Clone, Copy)]
-pub struct PacketEvent<'a>
+pub struct PacketEvent
 {
     pub header: Header,                 // Header
 
-    pub eventStringCode: [&'a str; 4],  // Event string code, see below
+    pub eventStringCode: [u8; 4],       // Event string code, see below
     pub eventDetails: EventDetails,     // Event details - should be interpreted differently for each type
 }
 
@@ -914,7 +1240,7 @@ impl Participant
             myTeam: bytes[4],
             raceNumber: bytes[5],
             nationality: bytes[6],
-            name: match bytes[7..55].try_into()
+            name: match bytes[7..7+48].try_into()
                     {
                         Ok(str) => str,
                         Err(err) => {
@@ -1096,7 +1422,7 @@ pub struct PacketCarTelemetry
 pub struct CarStatus
 {
     pub tractionControl: TractionControl,
-    pub antiLockBrakes: u8,             // 0 (off) - 1 (on)
+    pub antiLockBrakes: Assist,         // 0 (off) - 1 (on)
     pub fuelMix: FuelMix,
     pub frontBrakeBias: u8,             // Front brake bias (percentage)
     pub pitLimiterStatus: u8,           // Pit limiter status - 0 = off, 1 = on
@@ -1208,34 +1534,101 @@ pub struct PacketFinalClassification
  * Size: 1191 bytes
  * Version: 1
  */
-#[derive(Debug, Clone, Copy)]
-pub struct LobbyInfo<'a>
+#[repr(C, packed)] // Size: 52 Bytes
+#[derive(Clone, Copy)]
+pub struct LobbyInfo
 {
     pub aiControlled: u8,       // Whether the vehicle is AI (1) or Human (0) controlled
     pub teamId: u8,             // Team id - see appendix (255 if no team currently selected)
     pub nationality: u8,        // Nationality of the driver
-    pub name: [&'a str; 48],    // Name of participant in UTF-8 format – null terminated Will be truncated with ... (U+2026) if too long
+    pub name: [u8; 48],         // Name of participant in UTF-8 format – null terminated Will be truncated with ... (U+2026) if too long
     pub carNumber: u8,          // Car number of the player
     pub readyStatus: ReadyStatus,
+}
+
+impl LobbyInfo
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            aiControlled: bytes[0],
+            teamId      : bytes[1],
+            nationality : bytes[2],
+            name: match bytes[3..3+48].try_into()
+                    {
+                        Ok(str) => str,
+                        Err(err) => {
+                            dbg!(err);
+                            [0; 48]
+                        }
+                    },
+            carNumber   : bytes[51],
+            readyStatus : ReadyStatus::from_u8(&bytes[52]),
+        }
+    }
+}
+
+impl Default for LobbyInfo
+{
+    fn default() -> Self
+    {
+        Self {
+            aiControlled: 0,
+            teamId: 0,
+            nationality: 0,
+            name: [0; 48],
+            carNumber: 0,
+            readyStatus: ReadyStatus::default()
+        }
+    }
+}
+
+impl fmt::Debug for LobbyInfo
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LobbyInfo")
+         .field("aiControlled", &self.aiControlled)
+         .field(      "teamId", &self.teamId)
+         .field( "nationality", &self.nationality)
+         .field(        "name", &std::str::from_utf8(&self.name).unwrap().trim_end_matches('\0'))
+         .field(   "carNumber", &self.carNumber)
+         .field( "readyStatus", &self.readyStatus)
+         .finish()
+    }
 }
 
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum ReadyStatus {
-    NotReady = 0,
     #[default]
+    NotReady = 0,
     Ready = 1,
     Spectating = 2,
 }
 
+impl ReadyStatus
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => ReadyStatus::NotReady,
+            1 => ReadyStatus::Ready,
+            2 => ReadyStatus::Spectating,
+            _ => ReadyStatus::NotReady,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
-pub struct PacketLobbyInfo<'a>
+pub struct PacketLobbyInfo
 {
     pub header: Header,   // Header
 
     pub numPlayers: u8,         // Number of players in the lobby data
-    pub lobbyPlayers: [LobbyInfo<'a>; 22],
+    pub lobbyPlayers: [LobbyInfo; 22],
 }
+
 
 
 /**
@@ -1245,6 +1638,7 @@ pub struct PacketLobbyInfo<'a>
  * Size: 948 bytes
  * Version: 1
  */
+#[repr(C, packed)] // Size: 30 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarDamage
 {
@@ -1287,6 +1681,7 @@ pub struct PacketCarDamage
  * Size: 1155 bytes
  * Version: 1
  */
+#[repr(C, packed)] // Size: 11 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LapHistory
 {
@@ -1311,6 +1706,7 @@ impl LapHistory
     }
 }
 
+#[repr(C, packed)] // Size: 3 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TyreStintHistory
 {
@@ -1355,15 +1751,15 @@ impl PacketSessionHistory
     {
         Self {
             header           : Header::unpack(&bytes),
-            carIdx           : bytes[28],
-            numLaps          : bytes[29],
-            numTyreStints    : bytes[30],
-            bestLapTimeLapNum: bytes[31],
-            bestSector1LapNum: bytes[32],
-            bestSector2LapNum: bytes[33],
-            bestSector3LapNum: bytes[34],
-            lapHistory       : Self::lapHistory(&bytes),
-            tyreStintsHistory: Self::tyreStintHistory(&bytes),
+            carIdx           : bytes[24],
+            numLaps          : bytes[25],
+            numTyreStints    : bytes[26],
+            bestLapTimeLapNum: bytes[27],
+            bestSector1LapNum: bytes[28],
+            bestSector2LapNum: bytes[29],
+            bestSector3LapNum: bytes[30],
+            lapHistory       : Self::lapHistory(&bytes[31..31+(size_of::<LapHistory>()*100)]),
+            tyreStintsHistory: Self::tyreStintHistory(&bytes[31+(size_of::<LapHistory>()*100)..(31+(size_of::<LapHistory>()*100))+(size_of::<TyreStintHistory>()*8)]),
         }
     }
 
@@ -1373,14 +1769,12 @@ impl PacketSessionHistory
 
         let size = size_of::<LapHistory>();
 
-        for i in 1..100
+        for i in 0..100
         {
-            let offsetStart = 34 + (i * size);
-            let offsetEnd   = 34 + (i * size) + size;
+            let start = i * size;
+            let end   = start + size;
 
-            println!("Offset: {offsetStart} .. {offsetEnd}");
-
-            lh[i] = LapHistory::unpack(&bytes[offsetStart..offsetEnd]);
+            lh[i] = LapHistory::unpack(&bytes[start..end]);
         }
 
         lh
@@ -1392,14 +1786,12 @@ impl PacketSessionHistory
 
         let size = size_of::<TyreStintHistory>();
 
-        for i in 1..8
+        for i in 0..8
         {
-            let offsetStart = 334 + (i * size);
-            let offsetEnd   = 334 + (i * size) + size;
+            let start = i * size;
+            let end   = start + size;
 
-            println!("Offset: {offsetStart} .. {offsetEnd}");
-
-            tsh[i] = TyreStintHistory::unpack(&bytes[offsetStart..offsetEnd]);
+            tsh[i] = TyreStintHistory::unpack(&bytes[start..end]);
         }
 
         tsh
