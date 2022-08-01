@@ -23,17 +23,10 @@ fn main() {
         let header = packet::Header::unpack(&buffer);
         
         match header.packetId {
-            Some(packet::PacketId::Motion) => {
-                dbg!(packet::PacketMotion::unpack(&buffer));
-            },
-            Some(packet::PacketId::SessionHistory) => {
-                dbg!(packet::PacketSessionHistory::unpack(&buffer));
-            }
             Some(packet::PacketId::Lap) => {
                 dbg!(packet::PacketLap::unpack(&buffer));
             }
             Some(_x) => {
-                dbg!(header);
                 println!("{} {:#?}", "Unhandled packetId".yellow(), header.packetId.unwrap());
             }
             None => {

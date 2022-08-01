@@ -240,8 +240,6 @@ impl PacketMotion
             let offsetStart = start + (i * size);
             let offsetEnd   = start + (i * size) + size;
 
-            println!("Offset: {offsetStart} .. {offsetEnd}");
-
             cm[i] = CarMotion::unpack(&bytes[offsetStart..offsetEnd]);
         }
 
@@ -423,6 +421,8 @@ pub enum SessionLength {
  * Size: 972 bytes
  * Version: 1
  */
+
+// 43
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Lap
 {
@@ -587,8 +587,8 @@ impl PacketLap
 
             laps: Self::lap(&bytes),
 
-            timeTrialPBCarIdx: bytes[971],
-            timeTrialRivalCarIdx: bytes[972],
+            timeTrialPBCarIdx: bytes[970],
+            timeTrialRivalCarIdx: bytes[971],
         }
     }
 
@@ -599,11 +599,12 @@ impl PacketLap
         let size = size_of::<Lap>();
         let start = size_of::<Header>();
 
-        for i in 1..22
+        for i in 0..22
         {
             let offsetStart = start + (i * size);
             let offsetEnd   = start + (i * size) + size;
 
+            println!("I: {i} Size: {size} & Start: {start}");
             println!("Offset: {offsetStart} .. {offsetEnd}");
 
             l[i] = Lap::unpack(&bytes[offsetStart..offsetEnd]);
