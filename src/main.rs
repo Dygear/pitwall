@@ -1,18 +1,11 @@
 #![allow(non_snake_case)]
-#![allow(unused_imports)]
 
-use std::{
-    mem::{
-        size_of
-    },
-    net::{
-        UdpSocket
-    }
-};
+use std::net::UdpSocket;
 use prctl::set_name;
 use colored::*;
 
 mod packet;
+use packet::*;
 
 fn main() {
     set_name("Timing and Scoring").expect("Couldn't set process title.");
@@ -28,23 +21,22 @@ fn main() {
         let (size, socketAddress) = socket.recv_from(&mut buffer).unwrap();
         println!("Got packet number {count} from {socketAddress} of size {size}.");
 
-        let header = packet::Header::unpack(&buffer);
+        let header = Header::unpack(&buffer);
         
         match header.packetId {
-            Some(packet::PacketId::Lap) => {
-                let lapPack = packet::PacketLap::unpack(&buffer);
-                dbg!(lapPack);
+            PacketId::Lap => {
+                dbg!(PacketLap::unpack(&buffer));
             }
-            Some(packet::PacketId::Participants) => {
-                let participantsPack = packet::PacketParticipants::unpack(&buffer);
-                dbg!(participantsPack);
+            PacketId::Participants => {
+                dbg!(PacketParticipants::unpack(&buffer));
             }
-            Some(_x) => {
-                println!("{} {:#?}", "Unhandled packetId".yellow(), header.packetId.unwrap());
-            }
-            None => {
+            PacketId::Unknown => {
                 dbg!(header);
-                println!("{} {:#?}", "Unknown PacketId".red(), header.packetId.unwrap());
+                println!("{}, of {size}, & of ID {:#?}", "Unknown PacketId".red(), header.packetId);
+            }
+            other => {
+                println!("{} {:#?}", "Unhandled packetId".yellow(), other);
+                unreachable!(); // Theoretically
             }
         };
     }

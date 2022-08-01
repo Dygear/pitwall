@@ -19,7 +19,7 @@ pub struct Header
     pub gameMajorVersion: u8,           // Game major version - "X.00"
     pub gameMinorVersion: u8,           // Game minor version - "1.XX"
     pub packetVersion: u8,              // Version of this packet type, all start from 1
-    pub packetId: Option<PacketId>,     // Identifier for the packet type, see below
+    pub packetId: PacketId,             // Identifier for the packet type, see below
     pub sessionUID: u64,                // Unique identifier for the session
     pub sessionTime: f32,               // Session timestamp
     pub frameIdentifier: u32,           // Identifier for the frame the data was retrieved on
@@ -54,6 +54,7 @@ impl Header
 #[derive(Debug, Default, Clone, Copy)]
 pub enum PacketId {
     #[default]
+    Unknown = 255,
     Motion = 0,                         // Contains all motion data for player’s car – only sent while player is in control
     Session = 1,                        // Data about the session – track, time left
     Lap = 2,                            // Data about all the lap times of cars in the session
@@ -69,21 +70,21 @@ pub enum PacketId {
 }
 
 impl PacketId {
-    fn from_u8(value: u8) -> Option<PacketId> {
+    fn from_u8(value: u8) -> Self {
         match value {
-            0 => Some(PacketId::Motion),
-            1 => Some(PacketId::Session),
-            2 => Some(PacketId::Lap),
-            3 => Some(PacketId::Event),
-            4 => Some(PacketId::Participants),
-            5 => Some(PacketId::CarSetups),
-            6 => Some(PacketId::CarTelemetry),
-            7 => Some(PacketId::CarStatus),
-            8 => Some(PacketId::FinalClassification),
-            9 => Some(PacketId::LobbyInfo),
-            10=> Some(PacketId::CarDamage),
-            11=> Some(PacketId::SessionHistory),
-            _ => None,
+            0 => PacketId::Motion,
+            1 => PacketId::Session,
+            2 => PacketId::Lap,
+            3 => PacketId::Event,
+            4 => PacketId::Participants,
+            5 => PacketId::CarSetups,
+            6 => PacketId::CarTelemetry,
+            7 => PacketId::CarStatus,
+            8 => PacketId::FinalClassification,
+            9 => PacketId::LobbyInfo,
+            10=> PacketId::CarDamage,
+            11=> PacketId::SessionHistory,
+            _ => PacketId::Unknown,
         }
     }
 }
