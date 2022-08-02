@@ -19,7 +19,7 @@ pub struct Header
     pub gameMajorVersion: u8,           // Game major version - "X.00"
     pub gameMinorVersion: u8,           // Game minor version - "1.XX"
     pub packetVersion: u8,              // Version of this packet type, all start from 1
-    pub packetId: PacketId,             // Identifier for the packet type, see below
+    pub packetId: PacketId,             // u8 - Identifier for the packet type, see below
     pub sessionUID: u64,                // Unique identifier for the session
     pub sessionTime: f32,               // Session timestamp
     pub frameIdentifier: u32,           // Identifier for the frame the data was retrieved on
@@ -43,6 +43,15 @@ impl Header
             playerCarIndex         : bytes[22],
             secondaryPlayerCarIndex: bytes[23],
         }
+    }
+
+    pub fn get_version(&self) -> String
+    {
+        format!(
+            "{}.{:0>2}",
+            self.gameMajorVersion,
+            self.gameMinorVersion
+        )
     }
 }
 
@@ -98,26 +107,80 @@ impl PacketId {
  * Version: 1
  */
 
-// Size: 60 Bytes
+#[repr(C, packed)] // Size: 16 Bytes
 #[derive(Debug, Default, Clone, Copy)]
-#[repr(packed)]
+pub struct Vector
+{
+    pub X: f32,
+    pub Y: f32,
+    pub Z: f32,
+}
+
+impl Vector
+{
+    fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            X: f32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
+            Y: f32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
+            Z: f32::from_le_bytes([bytes[ 8], bytes[ 9], bytes[10], bytes[11]]),
+        }
+    }
+}
+
+#[repr(C, packed)] // Size: 6 Bytes
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Direction
+{
+    pub X: i16,
+    pub Y: i16,
+    pub Z: i16,
+}
+
+impl Direction
+{
+    fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            X: i16::from_le_bytes([bytes[ 0], bytes[ 1]]),
+            Y: i16::from_le_bytes([bytes[ 2], bytes[ 3]]),
+            Z: i16::from_le_bytes([bytes[ 4], bytes[ 5]]),
+        }
+    }
+}
+
+#[repr(C, packed)] // Size: 16 Bytes
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Forces
+{
+    pub Lateral     : f32,
+    pub Longitudinal: f32,
+    pub Vertical    : f32,
+}
+
+impl Forces
+{
+    fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            Lateral     : f32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
+            Longitudinal: f32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
+            Vertical    : f32::from_le_bytes([bytes[ 8], bytes[ 9], bytes[10], bytes[11]]),
+        }
+    }
+}
+
+
+
+#[repr(packed)] // Size: 60 Bytes
+#[derive(Debug, Default, Clone, Copy)]
 pub struct CarMotion
 {
-    pub worldPositionX: f32,            // World space X position
-    pub worldPositionY: f32,            // World space Y position
-    pub worldPositionZ: f32,            // World space Z position
-    pub worldVelocityX: f32,            // Velocity in world space X
-    pub worldVelocityY: f32,            // Velocity in world space Y
-    pub worldVelocityZ: f32,            // Velocity in world space Z
-    pub worldForwardDirX: i16,          // World space forward X direction (normalised)
-    pub worldForwardDirY: i16,          // World space forward Y direction (normalised)
-    pub worldForwardDirZ: i16,          // World space forward Z direction (normalised)
-    pub worldRightDirX: i16,            // World space right X direction (normalised)
-    pub worldRightDirY: i16,            // World space right Y direction (normalised)
-    pub worldRightDirZ: i16,            // World space right Z direction (normalised)
-    pub gForceLateral: f32,             // Lateral G-Force component
-    pub gForceLongitudinal: f32,        // Longitudinal G-Force component
-    pub gForceVertical: f32,            // Vertical G-Force component
+    pub worldPosition: Vector,          // World space position
+    pub worldVelocity: Vector,          // Velocity in world space
+    pub worldForward: Direction,        // World space forward direction (normalised)
+    pub worldRight: Direction,          // World space right direction (normalised)
+    pub gForce: Forces,                 // G-Forces
     pub yaw: f32,                       // Yaw angle in radians
     pub pitch: f32,                     // Pitch angle in radians
     pub roll: f32,                      // Roll angle in radians
@@ -128,21 +191,11 @@ impl CarMotion
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            worldPositionX    : f32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
-            worldPositionY    : f32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
-            worldPositionZ    : f32::from_le_bytes([bytes[ 8], bytes[ 9], bytes[10], bytes[11]]),
-            worldVelocityX    : f32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
-            worldVelocityY    : f32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]),
-            worldVelocityZ    : f32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
-            worldForwardDirX  : i16::from_le_bytes([bytes[24], bytes[25]]),
-            worldForwardDirY  : i16::from_le_bytes([bytes[26], bytes[27]]),
-            worldForwardDirZ  : i16::from_le_bytes([bytes[28], bytes[29]]),
-            worldRightDirX    : i16::from_le_bytes([bytes[30], bytes[31]]),
-            worldRightDirY    : i16::from_le_bytes([bytes[32], bytes[33]]),
-            worldRightDirZ    : i16::from_le_bytes([bytes[34], bytes[35]]),
-            gForceLateral     : f32::from_le_bytes([bytes[36], bytes[37], bytes[38], bytes[39]]),
-            gForceLongitudinal: f32::from_le_bytes([bytes[40], bytes[41], bytes[42], bytes[43]]),
-            gForceVertical    : f32::from_le_bytes([bytes[44], bytes[45], bytes[46], bytes[47]]),
+            worldPosition     :    Vector::unpack(&bytes[ 0..11]),
+            worldVelocity     :    Vector::unpack(&bytes[12..23]),
+            worldForward      : Direction::unpack(&bytes[24..29]),
+            worldRight        : Direction::unpack(&bytes[30..35]),
+            gForce            :    Forces::unpack(&bytes[36..47]),
             yaw               : f32::from_le_bytes([bytes[48], bytes[49], bytes[50], bytes[51]]),
             pitch             : f32::from_le_bytes([bytes[52], bytes[53], bytes[54], bytes[55]]),
             roll              : f32::from_le_bytes([bytes[56], bytes[57], bytes[58], bytes[59]]),
@@ -150,30 +203,47 @@ impl CarMotion
     }
 }
 
-// Size: 
+#[repr(C, packed)] // Size: 16 Bytes
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Wheels
+{
+    pub RL: f32,
+    pub RR: f32,
+    pub FL: f32,
+    pub FR: f32,
+}
+
+impl Wheels
+{
+    fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            RL: f32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
+            RR: f32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
+            FL: f32::from_le_bytes([bytes[ 8], bytes[ 9], bytes[10], bytes[11]]),
+            FR: f32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]])
+        }
+    }
+}
+
+#[repr(C, packed)] // Size: 1464 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketMotion
 {
-    pub header: Header,                     // Header
+    pub header: Header,                 // 24 Bytes - Header
 
-    pub carMotion: [CarMotion; 22],         // Data for all cars on track
+    pub carMotion: [CarMotion; 22],     // Data for all cars on track
 
     // Extra player car ONLY data
-    pub suspensionPosition: [f32; 4],       // Note: All wheel arrays have the following order:
-    pub suspensionVelocity: [f32; 4],       // RL, RR, FL, FR
-    pub suspensionAcceleration: [f32; 4],   // RL, RR, FL, FR
-    pub wheelSpeed: [f32; 4],               // Speed of each wheel
-    pub wheelSlip: [f32; 4],                // Slip ratio for each wheel
-    pub localVelocityX: f32,                // Velocity in local space
-    pub localVelocityY: f32,                // Velocity in local space
-    pub localVelocityZ: f32,                // Velocity in local space
-    pub angularVelocityX: f32,              // Angular velocity x-component
-    pub angularVelocityY: f32,              // Angular velocity y-component
-    pub angularVelocityZ: f32,              // Angular velocity z-component
-    pub angularAccelerationX: f32,          // Angular velocity x-component
-    pub angularAccelerationY: f32,          // Angular velocity y-component
-    pub angularAccelerationZ: f32,          // Angular velocity z-component
-    pub frontWheelsAngle: f32,              // Current front wheels angle in radians
+    pub suspensionPosition: Wheels,     // Note: All wheel arrays have the following order:
+    pub suspensionVelocity: Wheels,     // RL, RR, FL, FR
+    pub suspensionAcceleration: Wheels, // RL, RR, FL, FR
+    pub wheelSpeed: Wheels,             // Speed of each wheel
+    pub wheelSlip: Wheels,              // Slip ratio for each wheel
+    pub localVelocity: Vector,          // Velocity in local space
+    pub angularVelocity: Vector,        // Angular velocity
+    pub angularAcceleration: Vector,    // Angular acceleration
+    pub frontWheelsAngle: f32,          // Current front wheels angle in radians
 }
 
 // Size: 1464 Bytes
@@ -184,65 +254,32 @@ impl PacketMotion
         Self {
             header: Header::unpack(&bytes),
 
-            carMotion: Self::carMotion(&bytes),
+            carMotion: Self::carMotion(&bytes[size_of::<Header>()..size_of::<Header>()+(size_of::<CarMotion>()*22)]),
 
             // Extra player car ONLY data
-            suspensionPosition: [
-                f32::from_le_bytes([bytes[1344], bytes[1345], bytes[1346], bytes[1347]]),
-                f32::from_le_bytes([bytes[1348], bytes[1349], bytes[1350], bytes[1351]]),
-                f32::from_le_bytes([bytes[1352], bytes[1352], bytes[1353], bytes[1354]]),
-                f32::from_le_bytes([bytes[1356], bytes[1357], bytes[1358], bytes[1359]]),
-            ],
-            suspensionVelocity: [
-                f32::from_le_bytes([bytes[1360], bytes[1361], bytes[1362], bytes[1363]]),
-                f32::from_le_bytes([bytes[1364], bytes[1365], bytes[1366], bytes[1367]]),
-                f32::from_le_bytes([bytes[1368], bytes[1369], bytes[1370], bytes[1371]]),
-                f32::from_le_bytes([bytes[1372], bytes[1373], bytes[1374], bytes[1375]]),
-            ],
-            suspensionAcceleration: [
-                f32::from_le_bytes([bytes[1376], bytes[1377], bytes[1378], bytes[1379]]),
-                f32::from_le_bytes([bytes[1380], bytes[1381], bytes[1382], bytes[1383]]),
-                f32::from_le_bytes([bytes[1384], bytes[1385], bytes[1386], bytes[1387]]),
-                f32::from_le_bytes([bytes[1388], bytes[1389], bytes[1390], bytes[1391]]),
-            ],
-            wheelSpeed: [
-                f32::from_le_bytes([bytes[1392], bytes[1393], bytes[1394], bytes[1395]]),
-                f32::from_le_bytes([bytes[1396], bytes[1397], bytes[1398], bytes[1399]]),
-                f32::from_le_bytes([bytes[1400], bytes[1401], bytes[1402], bytes[1403]]),
-                f32::from_le_bytes([bytes[1404], bytes[1405], bytes[1406], bytes[1407]]),
-            ],
-            wheelSlip: [
-                f32::from_le_bytes([bytes[1408], bytes[1409], bytes[1410], bytes[1411]]),
-                f32::from_le_bytes([bytes[1412], bytes[1413], bytes[1414], bytes[1415]]),
-                f32::from_le_bytes([bytes[1416], bytes[1417], bytes[1418], bytes[1419]]),
-                f32::from_le_bytes([bytes[1420], bytes[1421], bytes[1422], bytes[1423]]),
-            ],
-            localVelocityX      : f32::from_le_bytes([bytes[1424], bytes[1425], bytes[1426], bytes[1427]]),
-            localVelocityY      : f32::from_le_bytes([bytes[1428], bytes[1429], bytes[1430], bytes[1431]]),
-            localVelocityZ      : f32::from_le_bytes([bytes[1432], bytes[1433], bytes[1434], bytes[1435]]),
-            angularVelocityX    : f32::from_le_bytes([bytes[1436], bytes[1437], bytes[1438], bytes[1439]]),
-            angularVelocityY    : f32::from_le_bytes([bytes[1440], bytes[1441], bytes[1442], bytes[1443]]),
-            angularVelocityZ    : f32::from_le_bytes([bytes[1444], bytes[1445], bytes[1446], bytes[1447]]),
-            angularAccelerationX: f32::from_le_bytes([bytes[1448], bytes[1449], bytes[1450], bytes[1451]]),
-            angularAccelerationY: f32::from_le_bytes([bytes[1452], bytes[1453], bytes[1454], bytes[1455]]),
-            angularAccelerationZ: f32::from_le_bytes([bytes[1456], bytes[1457], bytes[1458], bytes[1459]]),
-            frontWheelsAngle    : f32::from_le_bytes([bytes[1460], bytes[1461], bytes[1462], bytes[1463]]),
+            suspensionPosition    : Wheels::unpack(&bytes[1344..1359]),
+            suspensionVelocity    : Wheels::unpack(&bytes[1360..1375]),
+            suspensionAcceleration: Wheels::unpack(&bytes[1376..1391]),
+            wheelSpeed            : Wheels::unpack(&bytes[1392..1407]),
+            wheelSlip             : Wheels::unpack(&bytes[1408..1423]),
+            localVelocity         : Vector::unpack(&bytes[1424..1435]),
+            angularVelocity       : Vector::unpack(&bytes[1436..1447]),
+            angularAcceleration   : Vector::unpack(&bytes[1448..1459]),
+            frontWheelsAngle      : f32::from_le_bytes([bytes[1460], bytes[1461], bytes[1462], bytes[1463]]),
         }
     }
 
     pub fn carMotion(bytes: &[u8]) -> [CarMotion; 22]
     {
         let mut cm = [CarMotion::default(); 22];
-
         let size = size_of::<CarMotion>();
-        let start = size_of::<Header>();
 
         for i in 1..22
         {
-            let offsetStart = start + (i * size);
-            let offsetEnd   = start + (i * size) + size;
+            let start = i * size;
+            let end = start + size;
 
-            cm[i] = CarMotion::unpack(&bytes[offsetStart..offsetEnd]);
+            cm[i] = CarMotion::unpack(&bytes[start..end]);
         }
 
         cm
@@ -261,7 +298,7 @@ impl PacketMotion
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MarshalZone
 {
-    pub zoneStart: f32,                // Fraction (0..1) of way through the lap the marshal zone starts
+    pub zoneStart: f32,                 // Fraction (0..1) of way through the lap the marshal zone starts
     pub zoneFlag: ZoneFlag,
 }
 
@@ -301,37 +338,6 @@ impl ZoneFlag
             3 => ZoneFlag::Yellow,
             4 => ZoneFlag::Red,
             _ => ZoneFlag::Invalid,
-        }
-    }
-}
-
-#[repr(C, packed)] // Size: 448 Bytes
-#[derive(Debug, Default, Clone, Copy)]
-pub struct WeatherForecast
-{
-    pub sessionType: Session,               // u8
-    pub timeOffset: u8,                     // Time in minutes the forecast is for
-    pub weather: Weather,                   // u8
-    pub trackTemperature: i8,               // Track temp. in degrees Celsius
-    pub trackTemperatureChange: Temperature,// i8
-    pub airTemperature: i8,                 // Air temp. in degrees celsius
-    pub airTemperatureChange: Temperature,  // i8
-    pub rainPercentage: u8,                 // Rain percentage (0-100)
-}
-
-impl WeatherForecast
-{
-    pub fn unpack(bytes: &[u8]) -> Self
-    {
-        Self {
-            sessionType: Session::from_u8(&bytes[0]),
-            timeOffset: bytes[1],
-            weather: Weather::from_u8(&bytes[2]),
-            trackTemperature: bytes[3] as i8,
-            trackTemperatureChange: Temperature::from_u8(&bytes[4]),
-            airTemperature: bytes[5] as i8,
-            airTemperatureChange: Temperature::from_u8(&bytes[6]),
-            rainPercentage: bytes[7],
         }
     }
 }
@@ -433,11 +439,42 @@ impl Temperature
     }
 }
 
+#[repr(C, packed)] // Size: 8 Bytes
+#[derive(Debug, Default, Clone, Copy)]
+pub struct WeatherForecast
+{
+    pub sessionType: Session,           // u8
+    pub timeOffset: u8,                 // Time in minutes the forecast is for
+    pub weather: Weather,               // u8
+    pub trackTemperature: i8,           // Track temp. in degrees Celsius
+    pub trackTChange: Temperature,      // i8
+    pub airTemperature: i8,             // Air temp. in degrees celsius
+    pub airChange: Temperature,         // i8
+    pub rainPercentage: u8,             // Rain percentage (0-100)
+}
+
+impl WeatherForecast
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            sessionType     : Session::from_u8(&bytes[0]),
+            timeOffset      : bytes[1],
+            weather         : Weather::from_u8(&bytes[2]),
+            trackTemperature: bytes[3] as i8,
+            trackTChange    : Temperature::from_u8(&bytes[4]),
+            airTemperature  : bytes[5] as i8,
+            airChange       : Temperature::from_u8(&bytes[6]),
+            rainPercentage  : bytes[7],
+        }
+    }
+}
+
 #[repr(C, packed)] // Size: 632 Bytes
 #[derive(Debug, Clone, Copy)]
 pub struct PacketSession
 {
-    pub header: Header,                 // Header
+    pub header: Header,                 // 24 Bytes - Header
 
     pub weather: Weather,               // u8
     pub trackTemperature: i8,           // Track temp. in degrees celsius
@@ -754,30 +791,30 @@ impl SessionLength
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Lap
 {
-    pub lastLapTimeInMS: u32,               // Last lap time in milliseconds
-    pub currentLapTimeInMS: u32,            // Current time around the lap in milliseconds
-    pub sector1TimeInMS: u16,               // Sector 1 time in milliseconds
-    pub sector2TimeInMS: u16,               // Sector 2 time in milliseconds
-    pub lapDistance: f32,                   // Distance vehicle is around current lap in metres – could be negative if line hasn’t been crossed yet
-    pub totalDistance: f32,                 // Total distance travelled in session in metres – could be negative if line hasn’t been crossed yet
-    pub safetyCarDelta: f32,                // Delta in seconds for safety car
-    pub carPosition: u8,                    // Car race position
-    pub currentLapNum: u8,                  // Current lap number
-    pub pitStatus: PitStatus,               // u8
-    pub numPitStops: u8,                    // Number of pit stops taken in this race
-    pub sector: u8,                         // 0 = sector1, 1 = sector2, 2 = sector3
-    pub currentLapInvalid: u8,              // Current lap invalid - 0 = valid, 1 = invalid
-    pub penalties: u8,                      // Accumulated time penalties in seconds to be added
-    pub warnings: u8,                       // Accumulated number of warnings issued
-    pub numUnservedDriveThroughPens: u8,    // Num drive through pens left to serve
-    pub numUnservedStopGoPens: u8,          // Num stop go pens left to serve
-    pub gridPosition: u8,                   // Grid position the vehicle started the race in
-    pub driverStatus: Driver,               // u8
-    pub resultStatus: ResultStatus,         // u8
-    pub pitLaneTimerActive: u8,             // Pit lane timing, 0 = inactive, 1 = active
-    pub pitLaneTimeInLaneInMS: u16,         // If active, the current time spent in the pit lane in ms
-    pub pitStopTimerInMS: u16,              // Time of the actual pit stop in ms
-    pub pitStopShouldServePen: u8,          // Whether the car should serve a penalty at this stop
+    pub lastLapTimeInMS: u32,           // Last lap time in milliseconds
+    pub currentLapTimeInMS: u32,        // Current time around the lap in milliseconds
+    pub sector1TimeInMS: u16,           // Sector 1 time in milliseconds
+    pub sector2TimeInMS: u16,           // Sector 2 time in milliseconds
+    pub lapDistance: f32,               // Distance vehicle is around current lap in metres – could be negative if line hasn’t been crossed yet
+    pub totalDistance: f32,             // Total distance travelled in session in metres – could be negative if line hasn’t been crossed yet
+    pub safetyCarDelta: f32,            // Delta in seconds for safety car
+    pub carPosition: u8,                // Car race position
+    pub currentLapNum: u8,              // Current lap number
+    pub pitStatus: PitStatus,           // u8
+    pub numPitStops: u8,                // Number of pit stops taken in this race
+    pub sector: u8,                     // 0 = sector1, 1 = sector2, 2 = sector3
+    pub currentLapInvalid: u8,          // Current lap invalid - 0 = valid, 1 = invalid
+    pub penalties: u8,                  // Accumulated time penalties in seconds to be added
+    pub warnings: u8,                   // Accumulated number of warnings issued
+    pub numUnservedDriveThroughPens: u8,// Num drive through pens left to serve
+    pub numUnservedStopGoPens: u8,      // Num stop go pens left to serve
+    pub gridPosition: u8,               // Grid position the vehicle started the race in
+    pub driverStatus: Driver,           // u8
+    pub resultStatus: ResultStatus,     // u8
+    pub pitLaneTimerActive: u8,         // Pit lane timing, 0 = inactive, 1 = active
+    pub pitLaneTimeInLaneInMS: u16,     // If active, the current time spent in the pit lane in ms
+    pub pitStopTimerInMS: u16,          // Time of the actual pit stop in ms
+    pub pitStopShouldServePen: u8,      // Whether the car should serve a penalty at this stop
 }
 
 impl Lap
@@ -898,7 +935,7 @@ impl ResultStatus {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketLap
 {
-    pub header: Header,                 // Header
+    pub header: Header,                 // 24 Bytes - Header
 
     pub laps: [Lap; 22],                // Lap data for allpub  cars on track
 
@@ -1172,7 +1209,7 @@ impl Buttons
 #[derive(Clone, Copy)]
 pub struct PacketEvent
 {
-    pub header: Header,                 // Header
+    pub header: Header,                 // 24 Bytes - Header
 
     pub eventStringCode: [u8; 4],       // Event string code, see below
     pub eventDetails: EventDetails,     // Event details - should be interpreted differently for each type
@@ -1218,15 +1255,15 @@ pub enum EventStringCode
 #[derive(Clone, Copy)]
 pub struct Participant
 {
-    pub aiControlled: u8,       // Whether the vehicle is AI (1) or Human (0) controlled
-    pub driverId: u8,           // Driver id - see appendix, 255 if network human
-    pub networkId: u8,          // Network id – unique identifier for network players
-    pub teamId: u8,             // Team id - see appendix
-    pub myTeam: u8,             // My team flag – 1 = My Team, 0 = otherwise
-    pub raceNumber: u8,         // Race number of the car
-    pub nationality: u8,        // Nationality of the driver
-    pub name: [u8; 48],         // Name of participant in UTF-8 format – null terminated Will be truncated with … (U+2026) if too long
-    pub yourTelemetry: u8,      // The player's UDP setting, 0 = restricted, 1 = public
+    pub aiControlled: u8,               // Whether the vehicle is AI (1) or Human (0) controlled
+    pub driverId: u8,                   // Driver id - see appendix, 255 if network human
+    pub networkId: u8,                  // Network id – unique identifier for network players
+    pub teamId: u8,                     // Team id - see appendix
+    pub myTeam: u8,                     // My team flag – 1 = My Team, 0 = otherwise
+    pub raceNumber: u8,                 // Race number of the car
+    pub nationality: u8,                // Nationality of the driver
+    pub name: [u8; 48],                 // Name of participant in UTF-8 format – null terminated Will be truncated with … (U+2026) if too long
+    pub yourTelemetry: u8,              // The player's UDP setting, 0 = restricted, 1 = public
 }
 
 impl Participant
@@ -1293,9 +1330,9 @@ impl fmt::Debug for Participant
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketParticipants
 {
-    pub header: Header,     // Header
+    pub header: Header,                 // 24 Bytes - Header
 
-    pub numActiveCars: u8,      // Number of active cars in the data – should match number of cars on HUD
+    pub numActiveCars: u8,              // Number of active cars in the data – should match number of cars on HUD
     pub participants: [Participant; 22],
 }
 
@@ -1337,6 +1374,7 @@ impl<'a> PacketParticipants
  * Size: 1102 bytes
  * Version: 1
  */
+#[repr(C, packed)] // Size: 49 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarSetup
 {
@@ -1356,20 +1394,73 @@ pub struct CarSetup
     pub rearSuspensionHeight: u8,       // Rear ride height
     pub brakePressure: u8,              // Brake pressure (percentage)
     pub brakeBias: u8,                  // Brake bias (percentage)
-    pub rearLeftTyrePressure: f32,      // Rear left tyre pressure (PSI)
-    pub rearRightTyrePressure: f32,     // Rear right tyre pressure (PSI)
-    pub frontLeftTyrePressure: f32,     // Front left tyre pressure (PSI)
-    pub frontRightTyrePressure: f32,    // Front right tyre pressure (PSI)
+    pub tyrePressure: Wheels,           // Tyre pressures in PSI
     pub ballast: u8,                    // Ballast
     pub fuelLoad: f32,                  // Fuel load
+}
+
+impl CarSetup
+{
+    pub fn unpack(bytes: &[u8]) -> Self {
+        Self {
+            frontWing            : bytes[ 0],
+            rearWing             : bytes[ 1],
+            onThrottle           : bytes[ 2],
+            offThrottle          : bytes[ 3],
+            frontCamber          : f32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
+            rearCamber           : f32::from_le_bytes([bytes[ 8], bytes[ 9], bytes[10], bytes[11]]),
+            frontToe             : f32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
+            rearToe              : f32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]),
+            frontSuspension      : bytes[20],
+            rearSuspension       : bytes[21],
+            frontAntiRollBar     : bytes[22],
+            rearAntiRollBar      : bytes[23],
+            frontSuspensionHeight: bytes[24],
+            rearSuspensionHeight : bytes[25],
+            brakePressure        : bytes[26],
+            brakeBias            : bytes[27],
+            tyrePressure         : Wheels::unpack(&bytes[28..44]),
+            ballast              : bytes[44],
+            fuelLoad             : f32::from_le_bytes([bytes[45], bytes[46], bytes[47], bytes[48]]),
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarSetup
 {
-    pub header: Header,            // Header
+    pub header: Header,                 // 24 Bytes - Header
 
     pub carSetups: [CarSetup; 22],
+}
+
+impl PacketCarSetup
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+            header: Header::unpack(&bytes),
+
+            carSetups: Self::carSetups(&bytes[size_of::<Header>()..])
+        }
+    }
+
+    pub fn carSetups(bytes: &[u8]) -> [CarSetup; 22]
+    {
+        let mut cs = [CarSetup::default(); 22];
+        let size = size_of::<CarSetup>();
+
+        for i in 0..22
+        {
+            let start = i * size;
+            let end = start + size;
+
+            cs[i] = CarSetup::unpack(&bytes[start..end]);
+        }
+
+        cs
+    }
 }
 
 /**
@@ -1379,6 +1470,111 @@ pub struct PacketCarSetup
  * Size: 1347 bytes
  * Version: 1
  */
+#[repr(i8)]
+#[derive(Debug, Default, Clone, Copy)]
+pub enum Gear
+{
+    Reverse =-1,
+    #[default]
+    Neutral = 0,
+    First   = 1,
+    Second  = 2,
+    Third   = 3,
+    Forth   = 4,
+    Fifth   = 5,
+    Sixth   = 6,
+    Seventh = 7,
+    Eighth  = 8,
+}
+
+impl Gear
+{
+    pub fn from_u8_to_i8(byte: &u8) -> Self
+    {
+        match *byte as i8
+        {
+            -1 => Gear::Reverse,
+             0 => Gear::Neutral,
+             1 => Gear::First,
+             2 => Gear::Second,
+             3 => Gear::Third,
+             4 => Gear::Forth,
+             5 => Gear::Fifth,
+             6 => Gear::Sixth,
+             7 => Gear::Seventh,
+             8 => Gear::Eighth,
+             _ => unreachable!(),
+        }
+    }
+}
+
+#[repr(u16)]
+#[derive(Debug, Default, Clone, Copy)]
+pub enum RevLights
+{
+    #[default]
+    None      = 0b0000000000000000,
+    One       = 0b1000000000000000,
+    Two       = 0b0100000000000000,
+    Three     = 0b0010000000000000,
+    Four      = 0b0001000000000000,
+    Five      = 0b0000100000000000,
+    Six       = 0b0000010000000000,
+    Seven     = 0b0000001000000000,
+    Eight     = 0b0000000100000000,
+    Nine      = 0b0000000010000000,
+    Ten       = 0b0000000001000000,
+    Eleven    = 0b0000000000100000,
+    Twelve    = 0b0000000000010000,
+    Thriteen  = 0b0000000000001000,
+    Fourteen  = 0b0000000000000100,
+}
+
+impl RevLights
+{
+    pub fn from_u16(bytes: &[u8]) -> Self
+    {
+        match (bytes[0] | (8 >> bytes[1])) as u16
+        {
+            0b0000000000000000 => RevLights::None,
+            0b1000000000000000 => RevLights::One,
+            0b0100000000000000 => RevLights::Two,
+            0b0010000000000000 => RevLights::Three,
+            0b0001000000000000 => RevLights::Four,
+            0b0000100000000000 => RevLights::Five,
+            0b0000010000000000 => RevLights::Six,
+            0b0000001000000000 => RevLights::Seven,
+            0b0000000100000000 => RevLights::Eight,
+            0b0000000010000000 => RevLights::Nine,
+            0b0000000001000000 => RevLights::Ten,
+            0b0000000000100000 => RevLights::Eleven,
+            0b0000000000010000 => RevLights::Twelve,
+            0b0000000000001000 => RevLights::Thriteen,
+            0b0000000000000100 => RevLights::Fourteen,
+                             _ => RevLights::None,
+        }
+    }
+/*
+    pub fn to_string(&self) -> String
+    {
+        let mut string = String::with_capacity(14);
+        for i in 0..14
+        {
+            if (1 >> i^2) as u16 & *self as u16
+            {
+                string.push('O');
+            }
+            else
+            {
+                string.push('o');
+            }
+        }
+        string
+    }
+*/
+}
+
+#[repr(C, packed)] // Size: 60 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarTelemetry
 {
@@ -1387,11 +1583,11 @@ pub struct CarTelemetry
     pub steer: f32,                         // Steering (-1.0 (full lock left) to 1.0 (full lock right))
     pub brake: f32,                         // Amount of brake applied (0.0 to 1.0)
     pub clutch: u8,                         // Amount of clutch applied (0 to 100)
-    pub gear: i8,                           // Gear selected (1-8, N=0, R=-1)
+    pub gear: Gear,                         // Gear selected (1-8, N=0, R=-1)
     pub engineRPM: u16,                     // Engine RPM
     pub drs: u8,                            // 0 = off, 1 = on
     pub revLightsPercent: u8,               // Rev lights indicator (percentage)
-    pub revLightsBitValue: u16,             // Rev lights (bit 0 = leftmost LED, bit 14 = rightmost LED)
+    pub revLightsBitValue: RevLights,       // Rev lights (bit 0 = leftmost LED, bit 14 = rightmost LED)
     pub brakesTemperature: [u16; 4],        // Brakes temperature (celsius)
     pub tyresSurfaceTemperature: [u8; 4],   // Tyres surface temperature (celsius)
     pub tyresInnerTemperature: [u8; 4],     // Tyres inner temperature (celsius)
@@ -1400,16 +1596,114 @@ pub struct CarTelemetry
     pub surfaceType: [u8; 4],               // Driving surface, see appendices
 }
 
+impl CarTelemetry
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            speed                  : u16::from_le_bytes([bytes[ 0], bytes[ 1]]),
+            throttle               : f32::from_le_bytes([bytes[ 2], bytes[ 3], bytes[ 4], bytes[ 5]]),
+            steer                  : f32::from_le_bytes([bytes[ 6], bytes[ 7], bytes[ 8], bytes[ 9]]),
+            brake                  : f32::from_le_bytes([bytes[10], bytes[11], bytes[12], bytes[13]]),
+            clutch                 : bytes[14],
+            gear                   : Gear::from_u8_to_i8(&bytes[15]),
+            engineRPM              : u16::from_le_bytes([bytes[16], bytes[17]]),
+            drs                    : bytes[18],
+            revLightsPercent       : bytes[19],
+            revLightsBitValue      : RevLights::from_u16(&bytes[20..21]),
+            brakesTemperature      : [
+                                     u16::from_le_bytes([bytes[22], bytes[23]]),
+                                     u16::from_le_bytes([bytes[24], bytes[25]]),
+                                     u16::from_le_bytes([bytes[26], bytes[27]]),
+                                     u16::from_le_bytes([bytes[28], bytes[29]]),
+            ],
+            tyresSurfaceTemperature: [bytes[30], bytes[31], bytes[32], bytes[33]],
+            tyresInnerTemperature  : [bytes[34], bytes[35], bytes[36], bytes[37]],
+            engineTemperature      : u16::from_le_bytes([bytes[38], bytes[39]]),
+            tyresPressure          : [
+                                     f32::from_le_bytes([bytes[40], bytes[41], bytes[42], bytes[43]]),
+                                     f32::from_le_bytes([bytes[44], bytes[45], bytes[46], bytes[47]]),
+                                     f32::from_le_bytes([bytes[48], bytes[49], bytes[50], bytes[50]]),
+                                     f32::from_le_bytes([bytes[52], bytes[53], bytes[54], bytes[55]]),
+            ],
+            surfaceType            : [bytes[56], bytes[57], bytes[58], bytes[59]],
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Default, Clone, Copy)]
+pub enum MFDPanel
+{
+    Setup = 0,
+    Pits = 1,
+    Damage = 2,
+    Engine = 3,
+    Temperatures = 4,
+    #[default]
+    Closed = 255,
+}
+
+impl MFDPanel
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+              0 => MFDPanel::Setup,
+              1 => MFDPanel::Pits,
+              2 => MFDPanel::Damage,
+              3 => MFDPanel::Engine,
+              4 => MFDPanel::Temperatures,
+            255 => MFDPanel::Closed,
+              _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarTelemetry
 {
-    pub header: Header,               // Header
+    pub header: Header,                     // 24 Bytes - Header
 
     pub carTelemetryData: [CarTelemetry; 22],
 
-    pub mfdPanelIndex: u8,                  // Index of MFD panel open - 255 = MFD closed Single player, race – 0 = Car setup, 1 = Pits 2 = Damage, 3 =  Engine, 4 = Temperatures May vary depending on game mode
-    pub mfdPanelIndexSecondaryPlayer: u8,   // See above
-    pub suggestedGear: i8,                  // Suggested gear for the player (1-8) 0 if no gear suggested
+    pub mfdFirstPlayer: MFDPanel,           // Index of MFD panel open - 255 = MFD closed Single player, race – 0 = Car setup, 1 = Pits 2 = Damage, 3 =  Engine, 4 = Temperatures May vary depending on game mode
+    pub mfdSecondaryPlayer: MFDPanel,       // See above
+    pub suggestedGear: Gear,                // Suggested gear for the player (1-8) 0 if no gear suggested
+}
+
+impl PacketCarTelemetry
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+            header            : Header::unpack(&bytes),
+
+            carTelemetryData  : Self::carTelemetry(&bytes[24..24+(60*22)]),
+
+            mfdFirstPlayer    : MFDPanel::from_u8(&bytes[1344]),
+            mfdSecondaryPlayer: MFDPanel::from_u8(&bytes[1345]),
+            suggestedGear     : Gear::from_u8_to_i8(&bytes[1346])
+        }
+    }
+
+    pub fn carTelemetry(bytes: &[u8]) -> [CarTelemetry; 22]
+    {
+        let mut ct = [CarTelemetry::default(); 22];
+        let size = size_of::<CarTelemetry>();
+
+        for i in 0..22
+        {
+            let start = size * i;
+            let end = start * size;
+
+            ct[i] = CarTelemetry::unpack(&bytes[start..end]);
+        }
+
+        ct
+    }
 }
 
 /**
@@ -1419,47 +1713,28 @@ pub struct PacketCarTelemetry
  * Size: 1058 bytes
  * Version: 1
  */
-#[derive(Debug, Default, Clone, Copy)]
-pub struct CarStatus
-{
-    pub tractionControl: TractionControl,
-    pub antiLockBrakes: Assist,         // 0 (off) - 1 (on)
-    pub fuelMix: FuelMix,
-    pub frontBrakeBias: u8,             // Front brake bias (percentage)
-    pub pitLimiterStatus: u8,           // Pit limiter status - 0 = off, 1 = on
-    pub fuelInTank: f32,                // Current fuel mass
-    pub fuelCapacity: f32,              // Fuel capacity
-    pub fuelRemainingLaps: f32,         // Fuel remaining in terms of laps (value on MFD)
-    pub maxRPM: u16,                    // Cars max RPM, point of rev limiter
-    pub idleRPM: u16,                   // Cars idle RPM
-    pub maxGears: u8,                   // Maximum number of gears
-    pub drsAllowed: u8,                 // 0 = not allowed, 1 = allowed
-    pub drsActivationDistance: u16,     // 0 = DRS not available, non-zero - DRS will be available in [X] metres
-    pub actualTyreCompound: u8,         // F1 Modern - 16 = C5, 17 = C4, 18 = C3, 19 = C2, 20 = C1 7 = inter, 8 = wet
-                                        // F1 Classic - 9 = dry, 10 = wet
-                                        // F2 – 11 = super soft, 12 = soft, 13 = medium, 14 = hard 15 = wet
-    pub visualTyreCompound: u8,         // F1 visual (can be different from actual compound)
-                                        // 16 = soft, 17 = medium, 18 = hard, 7 = inter, 8 = wet
-                                        // F1 Classic – same as above
-                                        // F2 ‘19, 15 = wet, 19 – super soft, 20 = soft
-                                        // 21 = medium , 22 = hard
-    pub tyresAgeLaps: u8,               // Age in laps of the current set of tyres
-    pub vehicleFiaFlags: ZoneFlag,
-    pub ersStoreEnergy: f32,            // ERS energy store in Joules
-    pub ersDeployMode: ErsDeployMode,
-    pub ersHarvestedThisLapMGUK: f32,   // ERS energy harvested this lap by MGU-K
-    pub ersHarvestedThisLapMGUH: f32,   // ERS energy harvested this lap by MGU-H
-    pub ersDeployedThisLap: f32,        // ERS energy deployed this lap
-    pub networkPaused: u8,              // Whether the car is paused in a network game
-}
-
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
-pub enum TractionControl {
+pub enum TC {
     #[default]
     Off = 0,
     Medium = 1,
     Full = 2,
+    Unknown = 255,
+}
+
+impl TC
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => TC::Off,
+            1 => TC::Medium,
+            2 => TC::Full,
+            _ => TC::Unknown,
+        }
+    }
 }
 
 #[repr(u8)]
@@ -1470,10 +1745,105 @@ pub enum FuelMix {
     Standard = 1,
     Rich = 2,
     Max = 3,
+    Unknown = 255,
 }
 
-// m_visualTyreCompound is a todo.
-// m_visualTyreCompound is a todo.
+impl FuelMix
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => FuelMix::Lean,
+            1 => FuelMix::Standard,
+            2 => FuelMix::Rich,
+            3 => FuelMix::Max,
+            _ => FuelMix::Unknown,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Default, Clone, Copy)]
+pub enum ActualCompound {
+             C1 = 20,
+             C2 = 19,
+             C3 = 18,
+             C4 = 17,
+             C5 = 16,
+          F2Wet = 15,
+         F2Hard = 14,
+       F2Medium = 13,
+         F2Soft = 12,
+    F2SuperSoft = 11,
+     ClassicWet = 10,
+     ClassicDry = 9,
+            Wet = 8,
+          Inter = 7,
+        #[default]
+        Unknown = 0
+}
+
+impl ActualCompound {
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            20 => ActualCompound::C1,
+            19 => ActualCompound::C2,
+            18 => ActualCompound::C3,
+            17 => ActualCompound::C4,
+            16 => ActualCompound::C5,
+            15 => ActualCompound::F2Wet,
+            14 => ActualCompound::F2Hard,
+            13 => ActualCompound::F2Medium,
+            12 => ActualCompound::F2Soft,
+            11 => ActualCompound::F2SuperSoft,
+            10 => ActualCompound::ClassicWet,
+             9 => ActualCompound::ClassicDry,
+             8 => ActualCompound::Wet,
+             7 => ActualCompound::Inter,
+             _ => ActualCompound::Unknown,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Default, Clone, Copy)]
+pub enum VisualCompound {
+         OldHard = 22,
+       OldMedium = 21,
+         OldSoft = 20,
+    OldSuperSoft = 19,
+            Hard = 18,
+            Soft = 16,
+          Medium = 17,
+          OldWet = 15,
+             Wet = 8,
+           Inter = 7,
+         #[default]
+         Unknown = 0,
+}
+
+impl VisualCompound {
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            22 => VisualCompound::OldHard,
+            21 => VisualCompound::OldMedium,
+            20 => VisualCompound::OldSoft,
+            19 => VisualCompound::OldSuperSoft,
+            18 => VisualCompound::Hard,
+            16 => VisualCompound::Soft,
+            17 => VisualCompound::Medium,
+            15 => VisualCompound::OldWet,
+             8 => VisualCompound::Wet,
+             7 => VisualCompound::Inter,
+             _ => VisualCompound::Unknown,
+        }
+    }
+}
 
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
@@ -1483,14 +1853,121 @@ pub enum ErsDeployMode {
     Medium = 1,
     Hotlap = 2,
     Overtake = 3,
+    Unknown = 255,
+}
+
+impl ErsDeployMode
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0 => ErsDeployMode::None,
+            1 => ErsDeployMode::Medium,
+            2 => ErsDeployMode::Hotlap,
+            3 => ErsDeployMode::Overtake,
+            _ => ErsDeployMode::Unknown,
+        }
+    }
+}
+
+#[repr(C, packed)] // Size: 44
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CarStatus
+{
+    pub tractionControl: TC,            // u8
+    pub antiLockBrakes: Assist,         // u8 - 0 (off) - 1 (on)
+    pub fuelMix: FuelMix,               // u8
+    pub frontBrakeBias: u8,             // Front brake bias (percentage)
+    pub pitLimiterStatus: u8,           // Pit limiter status - 0 = off, 1 = on
+    pub fuelInTank: f32,                // Current fuel mass
+    pub fuelCapacity: f32,              // Fuel capacity
+    pub fuelRemainingLaps: f32,         // Fuel remaining in terms of laps (value on MFD)
+    pub maxRPM: u16,                    // Cars max RPM, point of rev limiter
+    pub idleRPM: u16,                   // Cars idle RPM
+    pub maxGears: u8,                   // Maximum number of gears
+    pub drsAllowed: u8,                 // 0 = not allowed, 1 = allowed
+    pub drsActivationDistance: u16,     // 0 = DRS not available, non-zero - DRS will be available in [X] metres
+    pub actualTyre: ActualCompound,     // u8 - The Rubber on the Road
+    pub visualTyre: VisualCompound,     // u8 - The Visual look of the Rubber
+    pub tyresAgeLaps: u8,               // Age in laps of the current set of tyres
+    pub vehicleFiaFlags: ZoneFlag,      // u8
+    pub ersStoreEnergy: f32,            // ERS energy store in Joules
+    pub ersDeployMode: ErsDeployMode,   // u8
+    pub ersHarvestedThisLapMGUK: f32,   // ERS energy harvested this lap by MGU-K
+    pub ersHarvestedThisLapMGUH: f32,   // ERS energy harvested this lap by MGU-H
+    pub ersDeployedThisLap: f32,        // ERS energy deployed this lap
+    pub networkPaused: u8,              // Whether the car is paused in a network game
+}
+
+impl CarStatus
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+                tractionControl:             TC::from_u8(&bytes[ 0]),
+                 antiLockBrakes:         Assist::from_u8(&bytes[ 1]),
+                        fuelMix:        FuelMix::from_u8(&bytes[ 2]),
+                 frontBrakeBias: bytes[ 3],
+               pitLimiterStatus: bytes[ 4],
+                     fuelInTank:            f32::from_le_bytes([bytes[ 5], bytes[ 6], bytes[ 7], bytes[ 8]]),
+                   fuelCapacity:            f32::from_le_bytes([bytes[ 9], bytes[10], bytes[11], bytes[12]]),
+              fuelRemainingLaps:            f32::from_le_bytes([bytes[13], bytes[14], bytes[15], bytes[16]]),
+                         maxRPM:            u16::from_le_bytes([bytes[17], bytes[18]]),
+                        idleRPM:            u16::from_le_bytes([bytes[19], bytes[20]]),
+                       maxGears: bytes[21],
+                     drsAllowed: bytes[22],
+          drsActivationDistance:            u16::from_le_bytes([bytes[23], bytes[24]]),
+                     actualTyre: ActualCompound::from_u8(&bytes[25]),
+                     visualTyre: VisualCompound::from_u8(&bytes[26]),
+                   tyresAgeLaps: bytes[27],
+                vehicleFiaFlags:       ZoneFlag::from_u8_to_i8(&bytes[28]),
+                 ersStoreEnergy:            f32::from_le_bytes([bytes[29], bytes[30], bytes[31], bytes[32]]),
+                  ersDeployMode:  ErsDeployMode::from_u8(&bytes[25]),
+        ersHarvestedThisLapMGUK:            f32::from_le_bytes([bytes[33], bytes[34], bytes[35], bytes[36]]),
+        ersHarvestedThisLapMGUH:            f32::from_le_bytes([bytes[37], bytes[38], bytes[39], bytes[40]]),
+             ersDeployedThisLap:            f32::from_le_bytes([bytes[41], bytes[42], bytes[43], bytes[44]]),
+                  networkPaused: bytes[45],
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarStatus
 {
-    pub header: Header,           // Header
+    pub header: Header,                 // 24 Bytes - Header
 
     pub carStatusData: [CarStatus; 22],
+}
+
+impl PacketCarStatus
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+            header: Header::unpack(&bytes),
+
+            carStatusData: Self::carStatus(&bytes[24..]),
+        }
+    }
+
+    pub fn carStatus(bytes: &[u8]) -> [CarStatus; 22]
+    {
+        let mut cs = [CarStatus::default(); 22];
+        let size = size_of::<CarStatus>();
+
+        for i in 0..22
+        {
+            let start = size * i;
+            let end = start + size;
+
+            cs[i] = CarStatus::unpack(&bytes[start..end]);
+        }
+
+        cs
+    }
 }
 
 /**
@@ -1500,12 +1977,13 @@ pub struct PacketCarStatus
  * Size: 1015 bytes
  * Version: 1
  */
+#[repr(C, packed)] // Size: 45 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct FinalClassification
 {
     pub position: u8,               // Finishing position
     pub numLaps: u8,                // Number of laps completed
-    pub gridPosition: u8,           // Grid position of the car
+    pub gridPosition: u8,           // Grid position of `the car
     pub points: u8,                 // Number of points scored
     pub numPitStops: u8,            // Number of pit stops made
     pub resultStatus: ResultStatus,
@@ -1514,18 +1992,95 @@ pub struct FinalClassification
     pub penaltiesTime: u8,          // Total penalties accumulated in seconds
     pub numPenalties: u8,           // Number of penalties applied to this driver
     pub numTyreStints: u8,          // Number of tyres stints up to maximum
-    pub tyreStintsActual: [u8; 8],  // Actual tyres used by this driver
-    pub tyreStintsVisual: [u8; 8],  // Visual tyres used by this driver
+    pub tyreStintsActual: [ActualCompound; 8], // u8x8 Actual tyres used by this driver
+    pub tyreStintsVisual: [VisualCompound; 8], // u8x8 Visual tyres used by this driver
     pub tyreStintsEndLaps: [u8; 8], // The lap number stints end on
+}
+
+impl FinalClassification
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+                     position:                       bytes[ 0],
+                      numLaps:                       bytes[ 1],
+                 gridPosition:                       bytes[ 2],
+                       points:                       bytes[ 3],
+                  numPitStops:                       bytes[ 4],
+                 resultStatus: ResultStatus::from_u8(bytes[ 5]),
+              bestLapTimeInMS:   u32::from_le_bytes([bytes[ 6], bytes[ 7], bytes[ 8], bytes[ 9]]),
+                totalRaceTime:   f64::from_le_bytes([bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15], bytes[16], bytes[17]]),
+                penaltiesTime:                       bytes[18],
+                 numPenalties:                       bytes[19],
+                numTyreStints:                       bytes[20],
+             tyreStintsActual:     Self::actualTyre(&bytes[21..29]),
+             tyreStintsVisual:     Self::visualTyre(&bytes[29..37]),
+            tyreStintsEndLaps:[bytes[37], bytes[38], bytes[39], bytes[40], bytes[41], bytes[42], bytes[43], bytes[44]],
+        }
+    }
+
+    pub fn actualTyre(bytes: &[u8]) -> [ActualCompound; 8]
+    {
+        let mut ac = [ActualCompound::default(); 8];
+
+        for i in 0..8
+        {
+            ac[i] = ActualCompound::from_u8(&bytes[i])
+        }
+
+        ac
+    }
+    fn visualTyre(bytes: &[u8]) -> [VisualCompound; 8]
+    {
+        let mut vc = [VisualCompound::default(); 8];
+
+        for i in 0..8
+        {
+            vc[i] = VisualCompound::from_u8(&bytes[i])
+        }
+
+        vc
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketFinalClassification
 {
-    pub header: Header,             // Header
+    pub header: Header,             // 24 Bytes - Header
 
     pub numCars: u8,                // Number of cars in the final classification
     pub classificationData: [FinalClassification; 22],
+}
+
+impl PacketFinalClassification
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+            header: Header::unpack(&bytes),
+
+            numCars: bytes[25],
+            classificationData: Self::classificationData(&bytes[26..])
+        }
+    }
+
+    pub fn classificationData(bytes: &[u8]) -> [FinalClassification; 22]
+    {
+        let mut fc = [FinalClassification::default(); 22];
+        let size = size_of::<FinalClassification>();
+
+        for i in 0..22
+        {
+            let start = i * size;
+            let end = start + size;
+
+            fc[i] = FinalClassification::unpack(&bytes[start..end]);
+        }
+
+        fc
+    }
 }
 
 /**
@@ -1601,10 +2156,11 @@ impl fmt::Debug for LobbyInfo
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum ReadyStatus {
-    #[default]
     NotReady = 0,
     Ready = 1,
     Spectating = 2,
+    #[default]
+    Unknown = 255,
 }
 
 impl ReadyStatus
@@ -1616,7 +2172,7 @@ impl ReadyStatus
             0 => ReadyStatus::NotReady,
             1 => ReadyStatus::Ready,
             2 => ReadyStatus::Spectating,
-            _ => ReadyStatus::NotReady,
+            _ => ReadyStatus::Unknown,
         }
     }
 }
@@ -1624,9 +2180,9 @@ impl ReadyStatus
 #[derive(Debug, Clone, Copy)]
 pub struct PacketLobbyInfo
 {
-    pub header: Header,   // Header
+    pub header: Header,             // 24 Bytes - Header
 
-    pub numPlayers: u8,         // Number of players in the lobby data
+    pub numPlayers: u8,             // Number of players in the lobby data
     pub lobbyPlayers: [LobbyInfo; 22],
 }
 
@@ -1639,11 +2195,11 @@ pub struct PacketLobbyInfo
  * Size: 948 bytes
  * Version: 1
  */
-#[repr(C, packed)] // Size: 30 Bytes
+#[repr(C, packed)] // Size: 39 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarDamage
 {
-    pub tyresWear: [f32; 4],        // Tyre wear (percentage)
+    pub tyresWear: Wheels,          // Tyre wear (percentage)
     pub tyresDamage: [u8; 4],       // Tyre damage (percentage)
     pub brakesDamage: [u8; 4],      // Brakes damage (percentage)
     pub frontLeftWingDamage: u8,    // Front left wing damage (percentage)
@@ -1666,12 +2222,72 @@ pub struct CarDamage
     pub engineSeized: u8,           // Engine seized, 0 = OK, 1 = fault
 }
 
+impl CarDamage
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+                       tyresWear: Wheels::unpack(&bytes[0..15]),
+                     tyresDamage: [bytes[15], bytes[16], bytes[17], bytes[18]],
+                    brakesDamage: [bytes[19], bytes[20], bytes[21], bytes[22]],
+             frontLeftWingDamage: bytes[23],
+            frontRightWingDamage: bytes[24],
+                  rearWingDamage: bytes[25],
+                     floorDamage: bytes[26],
+                  diffuserDamage: bytes[27],
+                   sidepodDamage: bytes[28],
+                        drsFault: bytes[29],
+                        ersFault: bytes[30],
+                   gearBoxDamage: bytes[31],
+                    engineDamage: bytes[32],
+                  engineMGUHWear: bytes[33],
+                    engineESWear: bytes[34],
+                    engineCEWear: bytes[35],
+                   engineICEWear: bytes[36],
+                  engineMGUKWear: bytes[37],
+                    engineTCWear: bytes[38],
+                     engineBlown: bytes[39],
+                    engineSeized: bytes[40],
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarDamage
 {
-    pub header: Header,       // Header
+    pub header: Header,             // 24 Bytes - Header
 
     pub carDamageData: [CarDamage; 22],
+}
+
+impl PacketCarDamage
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+            header: Header::unpack(&bytes),
+
+            carDamageData: Self::carDamage(&bytes[23..])
+        }
+    }
+
+    pub fn carDamage(bytes: &[u8]) -> [CarDamage; 22]
+    {
+        let mut cd = [CarDamage::default(); 22];
+        let size = size_of::<CarDamage>();
+
+        for i in 0..22
+        {
+            let start = i * size;
+            let end = start + size;
+
+            cd[i] = CarDamage::unpack(&bytes[start..end]);
+        }
+
+        cd
+    }
 }
 
 /**
@@ -1682,15 +2298,50 @@ pub struct PacketCarDamage
  * Size: 1155 bytes
  * Version: 1
  */
+
+#[repr(u8)]
+#[derive(Debug, Default, Clone, Copy)]
+pub enum Valid
+{
+    #[default]
+    Lap         = 0b00000001,
+    Sector1     = 0b00000010,
+    Sector2     = 0b00000100,
+    Sector2And1 = 0b00000110,
+    Sector3     = 0b00001000,
+    Sector3And1 = 0b00001010,
+    Sector3And2 = 0b00001100,
+    All         = 0b00001111,
+}
+
+impl Valid
+{
+    pub fn from_u8(byte: &u8) -> Self
+    {
+        match byte
+        {
+            0b00000001 => Valid::Lap,
+            0b00000010 => Valid::Sector1,
+            0b00000100 => Valid::Sector2,
+            0b00000110 => Valid::Sector2And1,
+            0b00001000 => Valid::Sector3,
+            0b00001010 => Valid::Sector3And1,
+            0b00001100 => Valid::Sector3And2,
+            0b00001111 => Valid::All,
+            _          => unreachable!() 
+        }
+    }
+}
+
 #[repr(C, packed)] // Size: 11 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LapHistory
 {
-    pub lapTimeInMS: u32,       // Lap time in milliseconds
-    pub sector1TimeInMS: u16,   // Sector 1 time in milliseconds
-    pub sector2TimeInMS: u16,   // Sector 2 time in milliseconds
-    pub sector3TimeInMS: u16,   // Sector 3 time in milliseconds
-    pub lapValidBitFlags: u8,   // 0x01 bit set-lap valid, 0x02 bit set-sector 1 valid 0x04 bit set-sector 2 valid, 0x08 bit set-sector 3 valid
+    pub lapTimeInMS: u32,               // Lap time in milliseconds
+    pub sector1TimeInMS: u16,           // Sector 1 time in milliseconds
+    pub sector2TimeInMS: u16,           // Sector 2 time in milliseconds
+    pub sector3TimeInMS: u16,           // Sector 3 time in milliseconds
+    pub lapValidBitFlags: Valid,        // 0x01 bit set-lap valid, 0x02 bit set-sector 1 valid 0x04 bit set-sector 2 valid, 0x08 bit set-sector 3 valid
 }
 
 impl LapHistory
@@ -1702,7 +2353,7 @@ impl LapHistory
             sector1TimeInMS : u16::from_le_bytes([bytes[4], bytes[5]]),
             sector2TimeInMS : u16::from_le_bytes([bytes[6], bytes[7]]),
             sector3TimeInMS : u16::from_le_bytes([bytes[8], bytes[9]]),
-            lapValidBitFlags: bytes[10]
+            lapValidBitFlags: Valid::from_u8(&bytes[10])
         }
     }
 }
@@ -1731,7 +2382,7 @@ impl TyreStintHistory
 #[derive(Debug, Clone, Copy)]
 pub struct PacketSessionHistory
 {
-    pub header: Header,   // Header
+    pub header: Header,         // 24 Bytes - Header
 
     pub carIdx: u8,             // Index of the car this lap data relates to
     pub numLaps: u8,            // Num laps in the data (including current partial lap)
@@ -1759,8 +2410,8 @@ impl PacketSessionHistory
             bestSector1LapNum: bytes[28],
             bestSector2LapNum: bytes[29],
             bestSector3LapNum: bytes[30],
-            lapHistory       : Self::lapHistory(&bytes[31..31+(size_of::<LapHistory>()*100)]),
-            tyreStintsHistory: Self::tyreStintHistory(&bytes[31+(size_of::<LapHistory>()*100)..(31+(size_of::<LapHistory>()*100))+(size_of::<TyreStintHistory>()*8)]),
+            lapHistory       : Self::lapHistory(&bytes[(size_of::<Header>()+7)..(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)]),
+            tyreStintsHistory: Self::tyreStintHistory(&bytes[(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)..(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)+(size_of::<TyreStintHistory>()*8)]),
         }
     }
 
