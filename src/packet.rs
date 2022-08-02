@@ -621,7 +621,7 @@ pub enum Formula {
     Beta = 4,
     Supercars = 5,
     Esports = 6,
-    Formula22021 = 7
+    Formula22021 = 7,
     #[default]
     Poisoned = 255
 }
@@ -767,7 +767,7 @@ pub enum SessionLength {
     Medium = 4,
     MediumLong = 5,
     Long = 6,
-    Full = 7
+    Full = 7,
     #[default]
     Poisoned = 255
 }
