@@ -316,13 +316,14 @@ impl MarshalZone
 #[repr(i8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum ZoneFlag {
-    #[default]
     Invalid = -1,
     None = 0,
     Green = 1,
     Blue = 2,
     Yellow = 3,
     Red = 4,
+    #[default]
+    Unknown = 127
 }
 
 impl ZoneFlag
@@ -337,7 +338,7 @@ impl ZoneFlag
             2 => ZoneFlag::Blue,
             3 => ZoneFlag::Yellow,
             4 => ZoneFlag::Red,
-            _ => ZoneFlag::Invalid,
+            _ => ZoneFlag::Unknown,
         }
     }
 }
@@ -345,7 +346,6 @@ impl ZoneFlag
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Session {
-    #[default]
     Unknown = 0,
     Practice1 = 1,
     Practice2 = 2,
@@ -360,6 +360,8 @@ pub enum Session {
     Race2 = 11,
     Race3 = 12,
     TimeTrial = 13,
+    #[default]
+    Poisoned = 255,
 }
 
 impl Session
@@ -382,7 +384,7 @@ impl Session
             11=> Session::Race2,
             12=> Session::Race3,
             13=> Session::TimeTrial,
-            _ => Session::Unknown,
+            _ => Session::Poisoned,
         }
     }
 }
@@ -390,13 +392,14 @@ impl Session
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Weather {
-    #[default]
     Clear = 0,
     LightCloud = 1,
     Overcast = 2,
     RainLight = 3,
     RainHeavy = 4,
-    RainStorm = 5
+    RainStorm = 5,
+    #[default]
+    Poisoned = 255
 }
 
 impl Weather
@@ -411,7 +414,7 @@ impl Weather
             3 => Weather::RainLight,
             4 => Weather::RainHeavy,
             5 => Weather::RainStorm,
-            _ => Weather::Clear,
+            _ => Weather::Poisoned,
         }
     }
 }
@@ -421,8 +424,9 @@ impl Weather
 pub enum Temperature {
     Up = 0,
     Down = 1,
+    None = 2,
     #[default]
-    None = 2
+    Poisoned = 127
 }
 
 impl Temperature
@@ -434,7 +438,7 @@ impl Temperature
             0 => Temperature::Up,
             1 => Temperature::Down,
             2 => Temperature::None,
-            _ => Temperature::None,
+            _ => Temperature::Poisoned,
         }
     }
 }
@@ -610,7 +614,6 @@ impl PacketSession
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Formula {
-    #[default]
     Modern = 0,
     Classic = 1,
     Formula2 = 2,
@@ -619,6 +622,8 @@ pub enum Formula {
     Supercars = 5,
     Esports = 6,
     Formula22021 = 7
+    #[default]
+    Poisoned = 255
 }
 
 impl Formula
@@ -635,7 +640,7 @@ impl Formula
             5 => Formula::Supercars,
             6 => Formula::Esports,
             7 => Formula::Formula22021,
-            _ => Formula::Modern,
+            _ => Formula::Poisoned,
         }
     }
 }
@@ -643,9 +648,10 @@ impl Formula
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum SLIPro {
-    #[default]
     Inactive = 0,
     Active = 1,
+    #[default]
+    Poisoned = 255
 }
 
 impl SLIPro
@@ -656,7 +662,7 @@ impl SLIPro
         {
             0 => SLIPro::Inactive,
             1 => SLIPro::Active,
-            _ => SLIPro::Inactive,
+            _ => SLIPro::Poisoned,
         }
     }
 }
@@ -664,9 +670,10 @@ impl SLIPro
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum NetworkGame {
-    #[default]
     Offline = 0,
     Online = 1,
+    #[default]
+    Poisoned = 255
 }
 
 impl NetworkGame
@@ -677,7 +684,7 @@ impl NetworkGame
         {
             0 => NetworkGame::Offline,
             1 => NetworkGame::Online,
-            _ => NetworkGame::Offline,
+            _ => NetworkGame::Poisoned,
         }
     }
 }
@@ -685,9 +692,10 @@ impl NetworkGame
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Accuracy {
-    #[default]
     Perfect = 0,
     Approximate = 1,
+    #[default]
+    Poisoned = 255
 }
 
 impl Accuracy {
@@ -697,7 +705,7 @@ impl Accuracy {
         {
             0 => Accuracy::Perfect,
             1 => Accuracy::Approximate,
-            _ => Accuracy::Perfect,
+            _ => Accuracy::Poisoned,
         }
     }
 }
@@ -705,9 +713,10 @@ impl Accuracy {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Assist {
-    #[default]
     Off = 0,
     On = 1,
+    #[default]
+    Poisoned = 255
 }
 
 impl Assist
@@ -718,7 +727,7 @@ impl Assist
         {
             0 => Assist::Off,
             1 => Assist::On,
-            _ => Assist::Off
+            _ => Assist::Poisoned
         }
     }
 }
@@ -726,11 +735,12 @@ impl Assist
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum SafetyCar {
-    #[default]
     Ready = 0,
     Deployed = 1,
     Virtual = 2,
     FormationLap = 3,
+    #[default]
+    Poisoned = 255
 }
 
 impl SafetyCar
@@ -743,7 +753,7 @@ impl SafetyCar
             1 => SafetyCar::Deployed,
             2 => SafetyCar::Virtual,
             3 => SafetyCar::FormationLap,
-            _ => SafetyCar::Ready,
+            _ => SafetyCar::Poisoned,
         }
     }
 }
@@ -751,7 +761,6 @@ impl SafetyCar
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum SessionLength {
-    #[default]
     None = 0,
     VeryShort = 2,
     Short = 3,
@@ -759,6 +768,8 @@ pub enum SessionLength {
     MediumLong = 5,
     Long = 6,
     Full = 7
+    #[default]
+    Poisoned = 255
 }
 
 impl SessionLength
@@ -774,7 +785,7 @@ impl SessionLength
             5 => SessionLength::MediumLong,
             6 => SessionLength::Long,
             7 => SessionLength::Full,
-            _ => SessionLength::None,
+            _ => SessionLength::Poisoned,
         }
     }
 }
@@ -853,10 +864,11 @@ impl Lap
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum PitStatus {
-    #[default]
     None = 0,
     Pitting = 1,
     InPitArea = 2,
+    #[default]
+    Poisoned = 255,
 }
 
 impl PitStatus
@@ -868,7 +880,7 @@ impl PitStatus
             0 => PitStatus::None,
             1 => PitStatus::Pitting,
             2 => PitStatus::InPitArea,
-            _ => PitStatus::None,
+            _ => PitStatus::Poisoned,
         }
     }
 }
@@ -876,12 +888,13 @@ impl PitStatus
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Driver {
-    #[default]
     InGarage = 0,
     OnFlyingLap = 1,
     InLap = 2,
     OutLap = 3,
     OnTrack = 4,
+    #[default]
+    Poisoned = 255,
 }
 
 impl Driver {
@@ -894,7 +907,7 @@ impl Driver {
             2 => Driver::InLap,
             3 => Driver::OutLap,
             4 => Driver::OnTrack,
-            _ => Driver::InGarage,
+            _ => Driver::Poisoned,
         }
     }
 }
@@ -902,7 +915,6 @@ impl Driver {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum ResultStatus {
-    #[default]
     Invalid = 0,
     Inactive = 1,
     Active = 2,
@@ -911,6 +923,8 @@ pub enum ResultStatus {
     Disqualified = 5,
     NotClassified = 6,
     Retired = 7,
+    #[default]
+    Poisoned = 255,
 }
 
 impl ResultStatus {
@@ -926,7 +940,7 @@ impl ResultStatus {
             5 => ResultStatus::Disqualified,
             6 => ResultStatus::NotClassified,
             7 => ResultStatus::Retired,
-            _ => ResultStatus::Invalid,
+            _ => ResultStatus::Poisoned,
         }
     }
 }
@@ -1475,7 +1489,6 @@ impl PacketCarSetup
 pub enum Gear
 {
     Reverse =-1,
-    #[default]
     Neutral = 0,
     First   = 1,
     Second  = 2,
@@ -1485,6 +1498,8 @@ pub enum Gear
     Sixth   = 6,
     Seventh = 7,
     Eighth  = 8,
+    #[default]
+    Poisoned= 127,
 }
 
 impl Gear
@@ -1503,7 +1518,7 @@ impl Gear
              6 => Gear::Sixth,
              7 => Gear::Seventh,
              8 => Gear::Eighth,
-             _ => unreachable!(),
+             _ => Gear::Poisoned,
         }
     }
 }
@@ -1512,7 +1527,6 @@ impl Gear
 #[derive(Debug, Default, Clone, Copy)]
 pub enum RevLights
 {
-    #[default]
     None      = 0b0000000000000000,
     One       = 0b1000000000000000,
     Two       = 0b0100000000000000,
@@ -1528,6 +1542,8 @@ pub enum RevLights
     Twelve    = 0b0000000000010000,
     Thriteen  = 0b0000000000001000,
     Fourteen  = 0b0000000000000100,
+    #[default]
+    Poisoned  = 0b1111111111111111,
 }
 
 impl RevLights
@@ -1551,7 +1567,7 @@ impl RevLights
             0b0000000000010000 => RevLights::Twelve,
             0b0000000000001000 => RevLights::Thriteen,
             0b0000000000000100 => RevLights::Fourteen,
-                             _ => RevLights::None,
+                             _ => RevLights::Poisoned,
         }
     }
 /*
@@ -1641,6 +1657,7 @@ pub enum MFDPanel
     Engine = 3,
     Temperatures = 4,
     #[default]
+    Poisoned = 254,
     Closed = 255,
 }
 
@@ -1656,7 +1673,7 @@ impl MFDPanel
               3 => MFDPanel::Engine,
               4 => MFDPanel::Temperatures,
             255 => MFDPanel::Closed,
-              _ => unreachable!(),
+              _ => MFDPanel::Poisoned,
         }
     }
 }
@@ -1716,11 +1733,11 @@ impl PacketCarTelemetry
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum TC {
-    #[default]
     Off = 0,
     Medium = 1,
     Full = 2,
-    Unknown = 255,
+    #[default]
+    Poisoned = 255,
 }
 
 impl TC
@@ -1732,7 +1749,7 @@ impl TC
             0 => TC::Off,
             1 => TC::Medium,
             2 => TC::Full,
-            _ => TC::Unknown,
+            _ => TC::Poisoned,
         }
     }
 }
@@ -1741,11 +1758,11 @@ impl TC
 #[derive(Debug, Default, Clone, Copy)]
 pub enum FuelMix {
     Lean = 0,
-    #[default]
     Standard = 1,
     Rich = 2,
     Max = 3,
-    Unknown = 255,
+    #[default]
+    Poisoned = 255,
 }
 
 impl FuelMix
@@ -1758,7 +1775,7 @@ impl FuelMix
             1 => FuelMix::Standard,
             2 => FuelMix::Rich,
             3 => FuelMix::Max,
-            _ => FuelMix::Unknown,
+            _ => FuelMix::Poisoned,
         }
     }
 }
@@ -1781,7 +1798,7 @@ pub enum ActualCompound {
             Wet = 8,
           Inter = 7,
         #[default]
-        Unknown = 0
+       Poisoned = 255
 }
 
 impl ActualCompound {
@@ -1803,7 +1820,7 @@ impl ActualCompound {
              9 => ActualCompound::ClassicDry,
              8 => ActualCompound::Wet,
              7 => ActualCompound::Inter,
-             _ => ActualCompound::Unknown,
+             _ => ActualCompound::Poisoned,
         }
     }
 }
@@ -1822,7 +1839,7 @@ pub enum VisualCompound {
              Wet = 8,
            Inter = 7,
          #[default]
-         Unknown = 0,
+        Poisoned = 0,
 }
 
 impl VisualCompound {
@@ -1840,7 +1857,7 @@ impl VisualCompound {
             15 => VisualCompound::OldWet,
              8 => VisualCompound::Wet,
              7 => VisualCompound::Inter,
-             _ => VisualCompound::Unknown,
+             _ => VisualCompound::Poisoned,
         }
     }
 }
@@ -1848,12 +1865,12 @@ impl VisualCompound {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum ErsDeployMode {
-    #[default]
     None = 0,
     Medium = 1,
     Hotlap = 2,
     Overtake = 3,
-    Unknown = 255,
+    #[default]
+    Poisoned = 255,
 }
 
 impl ErsDeployMode
@@ -1866,7 +1883,7 @@ impl ErsDeployMode
             1 => ErsDeployMode::Medium,
             2 => ErsDeployMode::Hotlap,
             3 => ErsDeployMode::Overtake,
-            _ => ErsDeployMode::Unknown,
+            _ => ErsDeployMode::Poisoned,
         }
     }
 }
@@ -2160,7 +2177,7 @@ pub enum ReadyStatus {
     Ready = 1,
     Spectating = 2,
     #[default]
-    Unknown = 255,
+    Poisoned = 255,
 }
 
 impl ReadyStatus
@@ -2172,7 +2189,7 @@ impl ReadyStatus
             0 => ReadyStatus::NotReady,
             1 => ReadyStatus::Ready,
             2 => ReadyStatus::Spectating,
-            _ => ReadyStatus::Unknown,
+            _ => ReadyStatus::Poisoned,
         }
     }
 }
@@ -2303,7 +2320,6 @@ impl PacketCarDamage
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Valid
 {
-    #[default]
     Lap         = 0b00000001,
     Sector1     = 0b00000010,
     Sector2     = 0b00000100,
@@ -2312,6 +2328,8 @@ pub enum Valid
     Sector3And1 = 0b00001010,
     Sector3And2 = 0b00001100,
     All         = 0b00001111,
+    #[default]
+    Poisoned    = 0b11110000,
 }
 
 impl Valid
@@ -2328,7 +2346,7 @@ impl Valid
             0b00001010 => Valid::Sector3And1,
             0b00001100 => Valid::Sector3And2,
             0b00001111 => Valid::All,
-            _          => unreachable!() 
+            _          => Valid::Poisoned,
         }
     }
 }
