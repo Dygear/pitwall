@@ -62,8 +62,6 @@ impl Header
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum PacketId {
-    #[default]
-    Unknown = 255,
     Motion = 0,                         // Contains all motion data for player’s car – only sent while player is in control
     Session = 1,                        // Data about the session – track, time left
     Lap = 2,                            // Data about all the lap times of cars in the session
@@ -75,7 +73,9 @@ pub enum PacketId {
     FinalClassification = 8,            // Final classification confirmation at the end of a race
     LobbyInfo = 9,                      // Information about players in a multiplayer lobby
     CarDamage = 10,                     // Damage status for all cars
-    SessionHistory = 11                 // Lap and tyre data for session
+    SessionHistory = 11,                // Lap and tyre data for session
+    #[default]
+    Poisoned = 255,
 }
 
 impl PacketId {
@@ -93,7 +93,7 @@ impl PacketId {
             9 => PacketId::LobbyInfo,
             10=> PacketId::CarDamage,
             11=> PacketId::SessionHistory,
-            _ => PacketId::Unknown,
+            _ => PacketId::Poisoned,
         }
     }
 }
@@ -2203,7 +2203,34 @@ pub struct PacketLobbyInfo
     pub lobbyPlayers: [LobbyInfo; 22],
 }
 
+impl PacketLobbyInfo
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            header: Header::unpack(&bytes),
 
+            numPlayers: bytes[24],
+            lobbyPlayers: Self::lobbyInfo(&bytes[25..]),
+        }
+    }
+
+    pub fn lobbyInfo(bytes: &[u8]) -> [LobbyInfo; 22]
+    {
+        let mut li = [LobbyInfo::default(); 22];
+        let size = size_of::<LobbyInfo>();
+
+        for i in 0..22
+        {
+            let start = i * size;
+            let end = start + size;
+
+            li[i] = LobbyInfo::unpack(&bytes[start..end]);
+        }
+
+        li
+    }
+}
 
 /**
  * # Car Damage Packet
