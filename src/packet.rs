@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
+use colored::Colorize;
 use std::mem::size_of;
 use std::fmt;
 
@@ -1535,70 +1536,101 @@ impl Gear
 
 #[repr(u16)]
 #[derive(Debug, Default, Clone, Copy)]
-pub enum RevLights
+pub enum LEDs
 {
-    None      = 0b0000000000000000,
-    One       = 0b1000000000000000,
-    Two       = 0b0100000000000000,
-    Three     = 0b0010000000000000,
-    Four      = 0b0001000000000000,
-    Five      = 0b0000100000000000,
-    Six       = 0b0000010000000000,
-    Seven     = 0b0000001000000000,
-    Eight     = 0b0000000100000000,
-    Nine      = 0b0000000010000000,
-    Ten       = 0b0000000001000000,
-    Eleven    = 0b0000000000100000,
-    Twelve    = 0b0000000000010000,
-    Thriteen  = 0b0000000000001000,
-    Fourteen  = 0b0000000000000100,
     #[default]
-    Poisoned  = 0b1111111111111111,
+    None         = 0b0000000000000000,
+    One          = 0b0000000000000001,
+    Two          = 0b0000000000000010,
+    Three        = 0b0000000000000100,
+    Four         = 0b0000000000001000,
+    Five         = 0b0000000000010000,
+    Six          = 0b0000000000100000,
+    Seven        = 0b0000000001000000,
+    Eight        = 0b0000000010000000,
+    Nine         = 0b0000000100000000,
+    Ten          = 0b0000001000000000,
+    Eleven       = 0b0000010000000000,
+    Twelve       = 0b0000100000000000,
+    Thriteen     = 0b0001000000000000,
+    Fourteen     = 0b0010000000000000,
+    Fifthteen    = 0b0100000000000000,
+}
+
+#[repr(C)] // Size: 2 Bytes
+#[derive(Default, Clone, Copy)]
+pub struct RevLights
+{
+    pub LEDs: u16,
 }
 
 impl RevLights
 {
-    pub fn from_u16(bytes: &[u8]) -> Self
+    pub fn unpack(bytes: &[u8]) -> Self
     {
-        match (bytes[0] | (8 >> bytes[1])) as u16
+        Self
         {
-            0b0000000000000000 => RevLights::None,
-            0b1000000000000000 => RevLights::One,
-            0b0100000000000000 => RevLights::Two,
-            0b0010000000000000 => RevLights::Three,
-            0b0001000000000000 => RevLights::Four,
-            0b0000100000000000 => RevLights::Five,
-            0b0000010000000000 => RevLights::Six,
-            0b0000001000000000 => RevLights::Seven,
-            0b0000000100000000 => RevLights::Eight,
-            0b0000000010000000 => RevLights::Nine,
-            0b0000000001000000 => RevLights::Ten,
-            0b0000000000100000 => RevLights::Eleven,
-            0b0000000000010000 => RevLights::Twelve,
-            0b0000000000001000 => RevLights::Thriteen,
-            0b0000000000000100 => RevLights::Fourteen,
-                             _ => RevLights::Poisoned,
+            LEDs: ((bytes[1] as u16) << 8) + bytes[0] as u16
         }
     }
-/*
-    pub fn to_string(&self) -> String
-    {
-        let mut string = String::with_capacity(14);
-        for i in 0..14
-        {
-            if (1 >> i^2) as u16 & *self as u16
-            {
-                string.push('O');
-            }
-            else
-            {
-                string.push('o');
-            }
-        }
-        string
-    }
-*/
 }
+
+impl fmt::Display for RevLights
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f,
+            "{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+            // Green
+            if (self.LEDs & LEDs::One          as u16) != 0 { "O".green()  } else { "o".white() },
+            if (self.LEDs & LEDs::Two          as u16) != 0 { "O".green()  } else { "o".white() },
+            if (self.LEDs & LEDs::Three        as u16) != 0 { "O".green()  } else { "o".white() },
+            if (self.LEDs & LEDs::Four         as u16) != 0 { "O".green()  } else { "o".white() },
+            if (self.LEDs & LEDs::Five         as u16) != 0 { "O".green()  } else { "o".white() },
+            // Red
+            if (self.LEDs & LEDs::Six          as u16) != 0 {  "O".red()   } else { "o".white() },
+            if (self.LEDs & LEDs::Seven        as u16) != 0 {  "O".red()   } else { "o".white() },
+            if (self.LEDs & LEDs::Eight        as u16) != 0 {  "O".red()   } else { "o".white() },
+            if (self.LEDs & LEDs::Nine         as u16) != 0 {  "O".red()   } else { "o".white() },
+            if (self.LEDs & LEDs::Ten          as u16) != 0 {  "O".red()   } else { "o".white() },
+            // Purple
+            if (self.LEDs & LEDs::Eleven       as u16) != 0 { "O".purple() } else { "o".white() },
+            if (self.LEDs & LEDs::Twelve       as u16) != 0 { "O".purple() } else { "o".white() },
+            if (self.LEDs & LEDs::Thriteen     as u16) != 0 { "O".purple() } else { "o".white() },
+            if (self.LEDs & LEDs::Fourteen     as u16) != 0 { "O".purple() } else { "o".white() },
+            if (self.LEDs & LEDs::Fifthteen    as u16) != 0 { "O".purple() } else { "o".white() },
+        )
+    }
+}
+
+impl fmt::Debug for RevLights
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f,
+            "{}{}{}{}{}{}{}{}{}{}{}{}{}{}{} ({:#016b})",
+            // Green
+            if (self.LEDs & LEDs::One          as u16) != 0 { "O".green()  } else { "o".white() },
+            if (self.LEDs & LEDs::Two          as u16) != 0 { "O".green()  } else { "o".white() },
+            if (self.LEDs & LEDs::Three        as u16) != 0 { "O".green()  } else { "o".white() },
+            if (self.LEDs & LEDs::Four         as u16) != 0 { "O".green()  } else { "o".white() },
+            if (self.LEDs & LEDs::Five         as u16) != 0 { "O".green()  } else { "o".white() },
+            // Red
+            if (self.LEDs & LEDs::Six          as u16) != 0 {  "O".red()   } else { "o".white() },
+            if (self.LEDs & LEDs::Seven        as u16) != 0 {  "O".red()   } else { "o".white() },
+            if (self.LEDs & LEDs::Eight        as u16) != 0 {  "O".red()   } else { "o".white() },
+            if (self.LEDs & LEDs::Nine         as u16) != 0 {  "O".red()   } else { "o".white() },
+            if (self.LEDs & LEDs::Ten          as u16) != 0 {  "O".red()   } else { "o".white() },
+            // Purple
+            if (self.LEDs & LEDs::Eleven       as u16) != 0 { "O".purple() } else { "o".white() },
+            if (self.LEDs & LEDs::Twelve       as u16) != 0 { "O".purple() } else { "o".white() },
+            if (self.LEDs & LEDs::Thriteen     as u16) != 0 { "O".purple() } else { "o".white() },
+            if (self.LEDs & LEDs::Fourteen     as u16) != 0 { "O".purple() } else { "o".white() },
+            if (self.LEDs & LEDs::Fifthteen    as u16) != 0 { "O".purple() } else { "o".white() },
+            // Value
+            self.LEDs
+        )
+    }
+}
+
 
 #[repr(C, packed)] // Size: 60 Bytes
 #[derive(Debug, Default, Clone, Copy)]
@@ -1636,7 +1668,7 @@ impl CarTelemetry
             engineRPM              : u16::from_le_bytes([bytes[16], bytes[17]]),
             drs                    : bytes[18],
             revLightsPercent       : bytes[19],
-            revLightsBitValue      : RevLights::from_u16(&bytes[20..21]),
+            revLightsBitValue      : RevLights::unpack(&bytes[20..22]),
             brakesTemperature      : [
                                      u16::from_le_bytes([bytes[22], bytes[23]]),
                                      u16::from_le_bytes([bytes[24], bytes[25]]),
@@ -1722,14 +1754,10 @@ impl PacketCarTelemetry
         let mut ct = [CarTelemetry::default(); 22];
         let size = size_of::<CarTelemetry>();
 
-        let len = bytes.len();
-
         for i in 0..22
         {
             let s = size * i;
             let e = s + size;
-
-            println!("Size: {size} of len {len} - Window of {s}..{e}");
 
             ct[i] = CarTelemetry::unpack(&bytes[s..e]);
         }
@@ -2375,7 +2403,7 @@ pub enum Valid
     Sector3And2 = 0b00001100,
     All         = 0b00001111,
     #[default]
-    Poisoned    = 0b11110000,
+    Poisoned    = 0b11111111,
 }
 
 impl Valid
@@ -2427,8 +2455,8 @@ impl LapHistory
 pub struct TyreStintHistory
 {
     pub endLap: u8,             // Lap the tyre usage ends on (255 of current tyre)
-    pub tyreActualCompound: u8, // Actual tyres used by this driver
-    pub tyreVisualCompound: u8, // Visual tyres used by this driver
+    pub tyreActualCompound: ActualCompound, // u8 Actual tyres used by this driver
+    pub tyreVisualCompound: VisualCompound, // u8 Visual tyres used by this driver
 }
 
 impl TyreStintHistory
@@ -2437,8 +2465,8 @@ impl TyreStintHistory
     {
         Self {
             endLap: bytes[0],
-            tyreActualCompound: bytes[1],
-            tyreVisualCompound: bytes[2]
+            tyreActualCompound: ActualCompound::from_u8(&bytes[1]),
+            tyreVisualCompound: VisualCompound::from_u8(&bytes[2]),
         }
     }
 }
@@ -2475,8 +2503,8 @@ impl PacketSessionHistory
             bestSector1LapNum: bytes[28],
             bestSector2LapNum: bytes[29],
             bestSector3LapNum: bytes[30],
-            lapHistory       : Self::lapHistory(&bytes[(size_of::<Header>()+7)..(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)]),
-            tyreStintsHistory: Self::tyreStintHistory(&bytes[(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)..(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)+(size_of::<TyreStintHistory>()*8)]),
+            lapHistory       : Self::lapHistory(&bytes[31..1131]),
+            tyreStintsHistory: Self::tyreStintHistory(&bytes[1131..]),
         }
     }
 
