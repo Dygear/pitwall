@@ -799,14 +799,72 @@ impl SessionLength
  * Version: 1
  */
 
+pub enum TimeInMS
+{
+    Lap(TimeLong),
+    Sector(TimeShort),
+    PitLane(TimeShort),
+    PitStop(TimeShort),
+}
+
+#[repr(C, packed)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct TimeLong
+{
+    pub TimeInMS: u32
+}
+
+impl TimeLong
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+            TimeInMS: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+        }
+    }
+}
+
+impl fmt::Display for TimeLong
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.3}", self.TimeInMS as f32 / 1000 as f32)
+    }
+}
+
+#[repr(C, packed)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct TimeShort
+{
+    pub TimeInMS: u16
+}
+
+impl TimeShort
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+            TimeInMS: u16::from_le_bytes([bytes[0], bytes[1]])
+        }
+    }
+}
+
+impl fmt::Display for TimeShort
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.3}", self.TimeInMS as f32 / 1000 as f32)
+    }
+}
+
 #[repr(C, packed)] // Size: 43 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Lap
 {
-    pub lastLapTimeInMS: u32,           // Last lap time in milliseconds
-    pub currentLapTimeInMS: u32,        // Current time around the lap in milliseconds
-    pub sector1TimeInMS: u16,           // Sector 1 time in milliseconds
-    pub sector2TimeInMS: u16,           // Sector 2 time in milliseconds
+    pub lastLapTimeInMS: TimeLong,      // Last lap time in milliseconds
+    pub currentLapTimeInMS: TimeLong,   // Current time around the lap in milliseconds
+    pub sector1TimeInMS: TimeShort,     // Sector 1 time in milliseconds
+    pub sector2TimeInMS: TimeShort,     // Sector 2 time in milliseconds
     pub lapDistance: f32,               // Distance vehicle is around current lap in metres – could be negative if line hasn’t been crossed yet
     pub totalDistance: f32,             // Total distance travelled in session in metres – could be negative if line hasn’t been crossed yet
     pub safetyCarDelta: f32,            // Delta in seconds for safety car
@@ -824,8 +882,8 @@ pub struct Lap
     pub driverStatus: Driver,           // u8
     pub resultStatus: ResultStatus,     // u8
     pub pitLaneTimerActive: u8,         // Pit lane timing, 0 = inactive, 1 = active
-    pub pitLaneTimeInLaneInMS: u16,     // If active, the current time spent in the pit lane in ms
-    pub pitStopTimerInMS: u16,          // Time of the actual pit stop in ms
+    pub pitLaneTimeInLaneInMS: TimeShort,// If active, the current time spent in the pit lane in ms
+    pub pitStopTimerInMS: TimeShort,    // Time of the actual pit stop in ms
     pub pitStopShouldServePen: u8,      // Whether the car should serve a penalty at this stop
 }
 
@@ -834,10 +892,10 @@ impl Lap
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            lastLapTimeInMS            : u32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
-            currentLapTimeInMS         : u32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
-            sector1TimeInMS            : u16::from_le_bytes([bytes[ 8], bytes[ 9]]),
-            sector2TimeInMS            : u16::from_le_bytes([bytes[10], bytes[11]]),
+            lastLapTimeInMS            : TimeLong::unpack(&bytes[ 0.. 4]),
+            currentLapTimeInMS         : TimeLong::unpack(&bytes[ 4.. 8]),
+            sector1TimeInMS            : TimeShort::unpack(&bytes[ 8..10]),
+            sector2TimeInMS            : TimeShort::unpack(&bytes[10..12]),
             lapDistance                : f32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
             totalDistance              : f32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]),
             safetyCarDelta             : f32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
@@ -855,8 +913,8 @@ impl Lap
             driverStatus               : Driver::from_u8(bytes[35]),
             resultStatus               : ResultStatus::from_u8(bytes[36]),
             pitLaneTimerActive         : bytes[37],
-            pitLaneTimeInLaneInMS      : u16::from_le_bytes([bytes[38], bytes[39]]),
-            pitStopTimerInMS           : u16::from_le_bytes([bytes[40], bytes[41]]),
+            pitLaneTimeInLaneInMS      : TimeShort::unpack(&bytes[38..40]),
+            pitStopTimerInMS           : TimeShort::unpack(&bytes[40..42]),
             pitStopShouldServePen      : bytes[42],
         }
     }
@@ -1414,6 +1472,11 @@ impl Participant
             yourTelemetry: bytes[55]
         }
     }
+
+    pub fn name_to_string(&self) -> String
+    {
+        std::str::from_utf8(&self.name).unwrap().trim_end_matches('\0').to_string()
+    }
 }
 
 impl Default for Participant
@@ -1594,6 +1657,31 @@ impl PacketCarSetups
  * Size: 1347 bytes
  * Version: 1
  */
+
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct KPH {
+    kph: u16
+}
+
+impl KPH {
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self
+        {
+            kph: ((bytes[1] as u16) << 8) + bytes[0] as u16
+        }
+    }
+    pub fn toMPH(&self) -> f32
+    {
+        self.kph as f32 * 0.6213711922373837
+    }
+    pub fn toMPHString(&self) -> String
+    {
+        format!("{:.3}", self.toMPH())
+    }
+}
+
 #[repr(i8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Gear
@@ -1730,17 +1818,16 @@ impl fmt::Debug for RevLights
     }
 }
 
-
 #[repr(C, packed)] // Size: 60 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarTelemetry
 {
-    pub speed: u16,                         // Speed of car in kilometres per hour
+    pub speed: KPH,                         // Speed of car in kilometres per hour
     pub throttle: f32,                      // Amount of throttle applied (0.0 to 1.0)
     pub steer: f32,                         // Steering (-1.0 (full lock left) to 1.0 (full lock right))
     pub brake: f32,                         // Amount of brake applied (0.0 to 1.0)
     pub clutch: u8,                         // Amount of clutch applied (0 to 100)
-    pub gear: Gear,                         // u8 1 Byte - Gear selected (1-8, N=0, R=-1)
+    pub gear: Gear,                         // i8 1 Byte - Gear selected (1-8, N=0, R=-1)
     pub engineRPM: u16,                     // Engine RPM
     pub drs: u8,                            // 0 = off, 1 = on
     pub revLightsPercent: u8,               // Rev lights indicator (percentage)
@@ -1758,7 +1845,7 @@ impl CarTelemetry
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            speed                  : u16::from_le_bytes([bytes[ 0], bytes[ 1]]),
+            speed                  : KPH::unpack(&bytes[ 0.. 2]),
             throttle               : f32::from_le_bytes([bytes[ 2], bytes[ 3], bytes[ 4], bytes[ 5]]),
             steer                  : f32::from_le_bytes([bytes[ 6], bytes[ 7], bytes[ 8], bytes[ 9]]),
             brake                  : f32::from_le_bytes([bytes[10], bytes[11], bytes[12], bytes[13]]),
@@ -1825,7 +1912,7 @@ pub struct PacketCarTelemetry
 {
     pub header: Header,                     // 24 Bytes - Header
 
-    pub carTelemetryData: [CarTelemetry; 22],// 60 * 22 = 1320 Bytes
+    pub carTelemetry: [CarTelemetry; 22],   // 60 * 22 = 1320 Bytes
 
     pub mfdFirstPlayer: MFDPanel,           // u8 - Index of MFD panel open - 255 = MFD closed Single player, race – 0 = Car setup, 1 = Pits 2 = Damage, 3 =  Engine, 4 = Temperatures May vary depending on game mode
     pub mfdSecondaryPlayer: MFDPanel,       // u8 - See above
@@ -1840,7 +1927,7 @@ impl PacketCarTelemetry
         {
             header            : Header::unpack(&bytes),
 
-            carTelemetryData  : Self::carTelemetry(&bytes[24..1344]),
+            carTelemetry      : Self::carTelemetry(&bytes[24..1344]),
 
             mfdFirstPlayer    : MFDPanel::from_u8(&bytes[1344]),
             mfdSecondaryPlayer: MFDPanel::from_u8(&bytes[1345]),
@@ -2098,7 +2185,7 @@ pub struct PacketCarStatus
 {
     pub header: Header,                 // 24 Bytes - Header
 
-    pub carStatusData: [CarStatus; 22],
+    pub carStatus: [CarStatus; 22],
 }
 
 impl PacketCarStatus
@@ -2109,7 +2196,7 @@ impl PacketCarStatus
         {
             header: Header::unpack(&bytes),
 
-            carStatusData: Self::carStatus(&bytes[24..]),
+            carStatus: Self::carStatus(&bytes[24..]),
         }
     }
 
@@ -2147,7 +2234,7 @@ pub struct FinalClassification
     pub points: u8,                 // Number of points scored
     pub numPitStops: u8,            // Number of pit stops made
     pub resultStatus: ResultStatus, // u8
-    pub bestLapTimeInMS: u32,       // Best lap time of the session in milliseconds
+    pub bestLapTimeInMS: TimeLong,  // Best lap time of the session in milliseconds
     pub totalRaceTime: f64,         // Total race time in seconds without penalties
     pub penaltiesTime: u8,          // Total penalties accumulated in seconds
     pub numPenalties: u8,           // Number of penalties applied to this driver
@@ -2169,7 +2256,7 @@ impl FinalClassification
                        points:                       bytes[ 3],
                   numPitStops:                       bytes[ 4],
                  resultStatus: ResultStatus::from_u8(bytes[ 5]),
-              bestLapTimeInMS:   u32::from_le_bytes([bytes[ 6], bytes[ 7], bytes[ 8], bytes[ 9]]),
+              bestLapTimeInMS:     TimeLong::unpack(&bytes[ 6..10]),
                 totalRaceTime:   f64::from_le_bytes([bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15], bytes[16], bytes[17]]),
                 penaltiesTime:                       bytes[18],
                  numPenalties:                       bytes[19],
@@ -2260,7 +2347,7 @@ pub struct LobbyInfo
     pub nationality: u8,        // Nationality of the driver
     pub name: [u8; 48],         // Name of participant in UTF-8 format – null terminated Will be truncated with ... (U+2026) if too long
     pub carNumber: u8,          // Car number of the player
-    pub readyStatus: ReadyStatus,//u7 
+    pub readyStatus: ReadyStatus,//u8
 }
 
 impl LobbyInfo
@@ -2282,6 +2369,11 @@ impl LobbyInfo
             carNumber   : bytes[51],
             readyStatus : ReadyStatus::from_u8(&bytes[52]),
         }
+    }
+
+    pub fn name_to_string(&self) -> String
+    {
+        std::str::from_utf8(&self.name).unwrap().trim_end_matches('\0').to_string()
     }
 }
 
@@ -2528,10 +2620,10 @@ impl Valid
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LapHistory
 {
-    pub lapTimeInMS: u32,               // Lap time in milliseconds
-    pub sector1TimeInMS: u16,           // Sector 1 time in milliseconds
-    pub sector2TimeInMS: u16,           // Sector 2 time in milliseconds
-    pub sector3TimeInMS: u16,           // Sector 3 time in milliseconds
+    pub lapTimeInMS: TimeLong,          // Lap time in milliseconds
+    pub sector1TimeInMS: TimeShort,     // Sector 1 time in milliseconds
+    pub sector2TimeInMS: TimeShort,     // Sector 2 time in milliseconds
+    pub sector3TimeInMS: TimeShort,     // Sector 3 time in milliseconds
     pub lapValidBitFlags: Valid,        // u8 - 0x01 bit set-lap valid, 0x02 bit set-sector 1 valid 0x04 bit set-sector 2 valid, 0x08 bit set-sector 3 valid
 }
 
@@ -2540,11 +2632,11 @@ impl LapHistory
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            lapTimeInMS     : u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
-            sector1TimeInMS : u16::from_le_bytes([bytes[4], bytes[5]]),
-            sector2TimeInMS : u16::from_le_bytes([bytes[6], bytes[7]]),
-            sector3TimeInMS : u16::from_le_bytes([bytes[8], bytes[9]]),
-            lapValidBitFlags: Valid::from_u8(&bytes[10])
+            lapTimeInMS     :  TimeLong::unpack(&bytes[ 0.. 4]),
+            sector1TimeInMS : TimeShort::unpack(&bytes[ 4.. 6]),
+            sector2TimeInMS : TimeShort::unpack(&bytes[ 6.. 8]),
+            sector3TimeInMS : TimeShort::unpack(&bytes[ 8..10]),
+            lapValidBitFlags:    Valid::from_u8(&bytes[10])
         }
     }
 }
