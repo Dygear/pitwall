@@ -257,14 +257,14 @@ impl PacketMotion
             carMotion: Self::carMotion(&bytes[size_of::<Header>()..size_of::<Header>()+(size_of::<CarMotion>()*22)]),
 
             // Extra player car ONLY data
-            suspensionPosition    : Wheels::unpack(&bytes[1344..1359]),
-            suspensionVelocity    : Wheels::unpack(&bytes[1360..1375]),
-            suspensionAcceleration: Wheels::unpack(&bytes[1376..1391]),
-            wheelSpeed            : Wheels::unpack(&bytes[1392..1407]),
-            wheelSlip             : Wheels::unpack(&bytes[1408..1423]),
-            localVelocity         : Vector::unpack(&bytes[1424..1435]),
-            angularVelocity       : Vector::unpack(&bytes[1436..1447]),
-            angularAcceleration   : Vector::unpack(&bytes[1448..1459]),
+            suspensionPosition    : Wheels::unpack(&bytes[1344..1360]),
+            suspensionVelocity    : Wheels::unpack(&bytes[1360..1376]),
+            suspensionAcceleration: Wheels::unpack(&bytes[1376..1392]),
+            wheelSpeed            : Wheels::unpack(&bytes[1392..1408]),
+            wheelSlip             : Wheels::unpack(&bytes[1408..1424]),
+            localVelocity         : Vector::unpack(&bytes[1424..1436]),
+            angularVelocity       : Vector::unpack(&bytes[1436..1448]),
+            angularAcceleration   : Vector::unpack(&bytes[1448..1460]),
             frontWheelsAngle      : f32::from_le_bytes([bytes[1460], bytes[1461], bytes[1462], bytes[1463]]),
         }
     }
@@ -2239,7 +2239,7 @@ impl PacketLobbyInfo
  * Size: 948 bytes
  * Version: 1
  */
-#[repr(C, packed)] // Size: 39 Bytes
+#[repr(C, packed)] // Size: 42 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarDamage
 {
@@ -2272,27 +2272,27 @@ impl CarDamage
     {
         Self
         {
-                       tyresWear: Wheels::unpack(&bytes[0..15]),
-                     tyresDamage: [bytes[15], bytes[16], bytes[17], bytes[18]],
-                    brakesDamage: [bytes[19], bytes[20], bytes[21], bytes[22]],
-             frontLeftWingDamage: bytes[23],
-            frontRightWingDamage: bytes[24],
-                  rearWingDamage: bytes[25],
-                     floorDamage: bytes[26],
-                  diffuserDamage: bytes[27],
-                   sidepodDamage: bytes[28],
-                        drsFault: bytes[29],
-                        ersFault: bytes[30],
-                   gearBoxDamage: bytes[31],
-                    engineDamage: bytes[32],
-                  engineMGUHWear: bytes[33],
-                    engineESWear: bytes[34],
-                    engineCEWear: bytes[35],
-                   engineICEWear: bytes[36],
-                  engineMGUKWear: bytes[37],
-                    engineTCWear: bytes[38],
-                     engineBlown: bytes[39],
-                    engineSeized: bytes[40],
+                       tyresWear: Wheels::unpack(&bytes[0..16]),
+                     tyresDamage: [bytes[16], bytes[17], bytes[18], bytes[19]],
+                    brakesDamage: [bytes[20], bytes[21], bytes[22], bytes[23]],
+             frontLeftWingDamage: bytes[24],
+            frontRightWingDamage: bytes[25],
+                  rearWingDamage: bytes[26],
+                     floorDamage: bytes[27],
+                  diffuserDamage: bytes[28],
+                   sidepodDamage: bytes[29],
+                        drsFault: bytes[30],
+                        ersFault: bytes[31],
+                   gearBoxDamage: bytes[32],
+                    engineDamage: bytes[33],
+                  engineMGUHWear: bytes[34],
+                    engineESWear: bytes[35],
+                    engineCEWear: bytes[36],
+                   engineICEWear: bytes[37],
+                  engineMGUKWear: bytes[38],
+                    engineTCWear: bytes[39],
+                     engineBlown: bytes[40],
+                    engineSeized: bytes[41],
         }
     }
 }
