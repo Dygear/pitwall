@@ -2239,7 +2239,7 @@ impl PacketLobbyInfo
  * Size: 948 bytes
  * Version: 1
  */
-#[repr(C, packed)] // Size: 42 Bytes
+#[repr(C, packed)] // Size: 43 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarDamage
 {
@@ -2272,27 +2272,27 @@ impl CarDamage
     {
         Self
         {
-                       tyresWear: Wheels::unpack(&bytes[0..16]),
-                     tyresDamage: [bytes[16], bytes[17], bytes[18], bytes[19]],
-                    brakesDamage: [bytes[20], bytes[21], bytes[22], bytes[23]],
-             frontLeftWingDamage: bytes[24],
-            frontRightWingDamage: bytes[25],
-                  rearWingDamage: bytes[26],
-                     floorDamage: bytes[27],
-                  diffuserDamage: bytes[28],
-                   sidepodDamage: bytes[29],
-                        drsFault: bytes[30],
-                        ersFault: bytes[31],
-                   gearBoxDamage: bytes[32],
-                    engineDamage: bytes[33],
-                  engineMGUHWear: bytes[34],
-                    engineESWear: bytes[35],
-                    engineCEWear: bytes[36],
-                   engineICEWear: bytes[37],
-                  engineMGUKWear: bytes[38],
-                    engineTCWear: bytes[39],
-                     engineBlown: bytes[40],
-                    engineSeized: bytes[41],
+                       tyresWear: Wheels::unpack(&bytes[0..17]),
+                     tyresDamage: [bytes[17], bytes[18], bytes[19], bytes[20]],
+                    brakesDamage: [bytes[21], bytes[22], bytes[23], bytes[24]],
+             frontLeftWingDamage: bytes[25],
+            frontRightWingDamage: bytes[26],
+                  rearWingDamage: bytes[27],
+                     floorDamage: bytes[28],
+                  diffuserDamage: bytes[29],
+                   sidepodDamage: bytes[30],
+                        drsFault: bytes[31],
+                        ersFault: bytes[32],
+                   gearBoxDamage: bytes[33],
+                    engineDamage: bytes[34],
+                  engineMGUHWear: bytes[35],
+                    engineESWear: bytes[36],
+                    engineCEWear: bytes[37],
+                   engineICEWear: bytes[38],
+                  engineMGUKWear: bytes[39],
+                    engineTCWear: bytes[40],
+                     engineBlown: bytes[41],
+                    engineSeized: bytes[42],
         }
     }
 }
