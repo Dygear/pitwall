@@ -11,7 +11,7 @@ use std::fmt;
  * Size: 24 Bytes
  */
 
-// Size: 24 Bytes
+#[repr(C, packed)] // Size: 24 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Header
 {
@@ -191,11 +191,11 @@ impl CarMotion
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            worldPosition     :    Vector::unpack(&bytes[ 0..11]),
-            worldVelocity     :    Vector::unpack(&bytes[12..23]),
-            worldForward      : Direction::unpack(&bytes[24..29]),
-            worldRight        : Direction::unpack(&bytes[30..35]),
-            gForce            :    Forces::unpack(&bytes[36..47]),
+            worldPosition     :    Vector::unpack(&bytes[ 0..12]),
+            worldVelocity     :    Vector::unpack(&bytes[12..24]),
+            worldForward      : Direction::unpack(&bytes[24..30]),
+            worldRight        : Direction::unpack(&bytes[30..36]),
+            gForce            :    Forces::unpack(&bytes[36..48]),
             yaw               : f32::from_le_bytes([bytes[48], bytes[49], bytes[50], bytes[51]]),
             pitch             : f32::from_le_bytes([bytes[52], bytes[53], bytes[54], bytes[55]]),
             roll              : f32::from_le_bytes([bytes[56], bytes[57], bytes[58], bytes[59]]),
@@ -232,7 +232,7 @@ pub struct PacketMotion
 {
     pub header: Header,                 // 24 Bytes - Header
 
-    pub carMotion: [CarMotion; 22],     // Data for all cars on track
+    pub carMotion: [CarMotion; 22],     // 60 Bytes * 22 - Data for all cars on track
 
     // Extra player car ONLY data
     pub suspensionPosition: Wheels,     // Note: All wheel arrays have the following order:
@@ -274,12 +274,12 @@ impl PacketMotion
         let mut cm = [CarMotion::default(); 22];
         let size = size_of::<CarMotion>();
 
-        for i in 1..22
+        for i in 0..22
         {
-            let start = i * size;
-            let end = start + size;
+            let s = i * size;
+            let e = s + size;
 
-            cm[i] = CarMotion::unpack(&bytes[start..end]);
+            cm[i] = CarMotion::unpack(&bytes[s..e]);
         }
 
         cm
@@ -294,12 +294,12 @@ impl PacketMotion
  * Size: 632 bytes
  * Version: 1
  */
-#[repr(C, packed)] // Size: 105 Bytes
+#[repr(C, packed)] // Size: 5 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MarshalZone
 {
     pub zoneStart: f32,                 // Fraction (0..1) of way through the lap the marshal zone starts
-    pub zoneFlag: ZoneFlag,
+    pub zoneFlag: ZoneFlag,             // i8
 }
 
 impl MarshalZone
@@ -584,10 +584,10 @@ impl PacketSession
 
         for i in 0..21
         {
-            let start = i * size;
-            let end = start + size;
+            let s = i * size;
+            let e = s + size;
 
-            mz[i] = MarshalZone::unpack(&bytes[start..end]);
+            mz[i] = MarshalZone::unpack(&bytes[s..e]);
         }
 
         mz
@@ -601,10 +601,10 @@ impl PacketSession
 
         for i in 0..56
         {
-            let start = i * size;
-            let end = start + size;
+            let s = i * size;
+            let e = s + size;
 
-            wf[i] = WeatherForecast::unpack(&bytes[start..end]);
+            wf[i] = WeatherForecast::unpack(&bytes[s..e]);
         }
 
         wf
@@ -964,7 +964,7 @@ impl PacketLap
         Self {
             header: Header::unpack(&bytes),
 
-            laps: Self::lap(&bytes[24..size_of::<Header>()+size_of::<Lap>()*22]),
+            laps: Self::lap(&bytes[24..970]),
 
             timeTrialPBCarIdx: bytes[970],
             timeTrialRivalCarIdx: bytes[971],
@@ -976,14 +976,13 @@ impl PacketLap
         let mut l = [Lap::default(); 22];
 
         let size = size_of::<Lap>();
-        let start = size_of::<Header>();
 
         for i in 0..22
         {
-            let offsetStart = start + (i * size);
-            let offsetEnd   = start + (i * size) + size;
+            let s = i * size;
+            let e = s + size;
 
-            l[i] = Lap::unpack(&bytes[offsetStart..offsetEnd]);
+            l[i] = Lap::unpack(&bytes[s..e]);
         }
 
         l
@@ -1000,6 +999,7 @@ impl PacketLap
 
 // The event details packet is different for each type of event.
 // Make sure only the correct type is interpreted.
+#[repr(C, packed)]
 #[derive(Clone, Copy)]
 pub union EventDetails
 {
@@ -1016,6 +1016,7 @@ pub union EventDetails
     pub buttons: Buttons,
 }
 
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct FastestLap
 {
@@ -1034,6 +1035,7 @@ impl FastestLap
     }
 }
 
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Retirement
 {
@@ -1050,6 +1052,7 @@ impl Retirement
     }
 }
 
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TeamMateInPits
 {
@@ -1066,6 +1069,7 @@ impl TeamMateInPits
     }
 }
 
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RaceWinner
 {
@@ -1082,6 +1086,7 @@ impl RaceWinner
     }
 }
 
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Penalty
 {
@@ -1110,6 +1115,7 @@ impl Penalty
     }
 }
 
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SpeedTrap
 {
@@ -1136,7 +1142,7 @@ impl SpeedTrap
     }
 }
 
-
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct StartLights
 {
@@ -1153,6 +1159,7 @@ impl StartLights
     }
 }
 
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DriveThroughPenaltyServed
 {
@@ -1170,6 +1177,7 @@ impl DriveThroughPenaltyServed
 
 }
 
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct StopGoPenaltyServed
 {
@@ -1186,6 +1194,7 @@ impl StopGoPenaltyServed
     }
 }
 
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Flashback
 {
@@ -1204,6 +1213,7 @@ impl Flashback
     }
 }
 
+#[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Buttons
 {
@@ -1220,6 +1230,7 @@ impl Buttons
     }
 }
 
+#[repr(C, packed)] // Size: 24 + 8 + (Depends) Bytes
 #[derive(Clone, Copy)]
 pub struct PacketEvent
 {
@@ -1265,7 +1276,7 @@ pub enum EventStringCode
  * Size: 1257 bytes
  * Version: 1
  */
-#[repr(C, packed)] // Size: 57 Bytes
+#[repr(C, packed)] // Size: 56 Bytes
 #[derive(Clone, Copy)]
 pub struct Participant
 {
@@ -1292,7 +1303,7 @@ impl Participant
             myTeam: bytes[4],
             raceNumber: bytes[5],
             nationality: bytes[6],
-            name: match bytes[7..7+48].try_into()
+            name: match bytes[7..55].try_into()
                     {
                         Ok(str) => str,
                         Err(err) => {
@@ -1340,7 +1351,7 @@ impl fmt::Debug for Participant
     }
 }
 
-#[repr(C, packed)] // 
+#[repr(C, packed)] // Size: 1257 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketParticipants
 {
@@ -1350,7 +1361,7 @@ pub struct PacketParticipants
     pub participants: [Participant; 22],
 }
 
-impl<'a> PacketParticipants
+impl PacketParticipants
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
@@ -1358,23 +1369,21 @@ impl<'a> PacketParticipants
             header: Header::unpack(&bytes),
 
             numActiveCars: bytes[25],
-            participants: Self::participants(&bytes),
+            participants: Self::participants(&bytes[25..]),
         }
     }
 
     pub fn participants(bytes: &[u8]) -> [Participant; 22]
     {
         let mut p = [Participant::default(); 22];
-
         let size = size_of::<Participant>();
-        let start = size_of::<Header>() + 1;
 
         for i in 0..22
         {
-            let offsetStart = start + (i * size);
-            let offsetEnd   = start + (i * size) + size;
+            let s = i * size;
+            let e = s + size;
 
-            p[i] = Participant::unpack(&bytes[offsetStart..offsetEnd]);
+            p[i] = Participant::unpack(&bytes[s..e]);
         }
 
         p
@@ -1408,7 +1417,7 @@ pub struct CarSetup
     pub rearSuspensionHeight: u8,       // Rear ride height
     pub brakePressure: u8,              // Brake pressure (percentage)
     pub brakeBias: u8,                  // Brake bias (percentage)
-    pub tyrePressure: Wheels,           // Tyre pressures in PSI
+    pub tyrePressure: Wheels,           // 16 Bytes - Tyre pressures in PSI
     pub ballast: u8,                    // Ballast
     pub fuelLoad: f32,                  // Fuel load
 }
@@ -1440,6 +1449,7 @@ impl CarSetup
     }
 }
 
+#[repr(C, packed)] // Size: 1102 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarSetup
 {
@@ -1467,10 +1477,10 @@ impl PacketCarSetup
 
         for i in 0..22
         {
-            let start = i * size;
-            let end = start + size;
+            let s = i * size;
+            let e = s + size;
 
-            cs[i] = CarSetup::unpack(&bytes[start..end]);
+            cs[i] = CarSetup::unpack(&bytes[s..e]);
         }
 
         cs
@@ -1599,11 +1609,11 @@ pub struct CarTelemetry
     pub steer: f32,                         // Steering (-1.0 (full lock left) to 1.0 (full lock right))
     pub brake: f32,                         // Amount of brake applied (0.0 to 1.0)
     pub clutch: u8,                         // Amount of clutch applied (0 to 100)
-    pub gear: Gear,                         // Gear selected (1-8, N=0, R=-1)
+    pub gear: Gear,                         // u8 1 Byte - Gear selected (1-8, N=0, R=-1)
     pub engineRPM: u16,                     // Engine RPM
     pub drs: u8,                            // 0 = off, 1 = on
     pub revLightsPercent: u8,               // Rev lights indicator (percentage)
-    pub revLightsBitValue: RevLights,       // Rev lights (bit 0 = leftmost LED, bit 14 = rightmost LED)
+    pub revLightsBitValue: RevLights,       // u16 2 Bytes - Rev lights (bit 0 = leftmost LED, bit 14 = rightmost LED)
     pub brakesTemperature: [u16; 4],        // Brakes temperature (celsius)
     pub tyresSurfaceTemperature: [u8; 4],   // Tyres surface temperature (celsius)
     pub tyresInnerTemperature: [u8; 4],     // Tyres inner temperature (celsius)
@@ -1678,16 +1688,17 @@ impl MFDPanel
     }
 }
 
+#[repr(C, packed)] // Size: 1347 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarTelemetry
 {
     pub header: Header,                     // 24 Bytes - Header
 
-    pub carTelemetryData: [CarTelemetry; 22],
+    pub carTelemetryData: [CarTelemetry; 22],// 60 * 22 = 1320 Bytes
 
-    pub mfdFirstPlayer: MFDPanel,           // Index of MFD panel open - 255 = MFD closed Single player, race – 0 = Car setup, 1 = Pits 2 = Damage, 3 =  Engine, 4 = Temperatures May vary depending on game mode
-    pub mfdSecondaryPlayer: MFDPanel,       // See above
-    pub suggestedGear: Gear,                // Suggested gear for the player (1-8) 0 if no gear suggested
+    pub mfdFirstPlayer: MFDPanel,           // u8 - Index of MFD panel open - 255 = MFD closed Single player, race – 0 = Car setup, 1 = Pits 2 = Damage, 3 =  Engine, 4 = Temperatures May vary depending on game mode
+    pub mfdSecondaryPlayer: MFDPanel,       // u8 - See above
+    pub suggestedGear: Gear,                // i8 - Suggested gear for the player (1-8) 0 if no gear suggested
 }
 
 impl PacketCarTelemetry
@@ -1698,7 +1709,7 @@ impl PacketCarTelemetry
         {
             header            : Header::unpack(&bytes),
 
-            carTelemetryData  : Self::carTelemetry(&bytes[24..24+(60*22)]),
+            carTelemetryData  : Self::carTelemetry(&bytes[24..1344]),
 
             mfdFirstPlayer    : MFDPanel::from_u8(&bytes[1344]),
             mfdSecondaryPlayer: MFDPanel::from_u8(&bytes[1345]),
@@ -1711,12 +1722,16 @@ impl PacketCarTelemetry
         let mut ct = [CarTelemetry::default(); 22];
         let size = size_of::<CarTelemetry>();
 
+        let len = bytes.len();
+
         for i in 0..22
         {
-            let start = size * i;
-            let end = start * size;
+            let s = size * i;
+            let e = s + size;
 
-            ct[i] = CarTelemetry::unpack(&bytes[start..end]);
+            println!("Size: {size} of len {len} - Window of {s}..{e}");
+
+            ct[i] = CarTelemetry::unpack(&bytes[s..e]);
         }
 
         ct
@@ -1950,6 +1965,7 @@ impl CarStatus
     }
 }
 
+#[repr(C, packed)] // Size: 992
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarStatus
 {
@@ -1977,10 +1993,10 @@ impl PacketCarStatus
 
         for i in 0..22
         {
-            let start = size * i;
-            let end = start + size;
+            let s = size * i;
+            let e = s + size;
 
-            cs[i] = CarStatus::unpack(&bytes[start..end]);
+            cs[i] = CarStatus::unpack(&bytes[s..e]);
         }
 
         cs
@@ -2003,7 +2019,7 @@ pub struct FinalClassification
     pub gridPosition: u8,           // Grid position of `the car
     pub points: u8,                 // Number of points scored
     pub numPitStops: u8,            // Number of pit stops made
-    pub resultStatus: ResultStatus,
+    pub resultStatus: ResultStatus, // u8
     pub bestLapTimeInMS: u32,       // Best lap time of the session in milliseconds
     pub totalRaceTime: f64,         // Total race time in seconds without penalties
     pub penaltiesTime: u8,          // Total penalties accumulated in seconds
@@ -2061,6 +2077,7 @@ impl FinalClassification
     }
 }
 
+#[repr(C, packed)] // Size: 1014 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketFinalClassification
 {
@@ -2090,10 +2107,10 @@ impl PacketFinalClassification
 
         for i in 0..22
         {
-            let start = i * size;
-            let end = start + size;
+            let s = i * size;
+            let e = s + size;
 
-            fc[i] = FinalClassification::unpack(&bytes[start..end]);
+            fc[i] = FinalClassification::unpack(&bytes[s..e]);
         }
 
         fc
@@ -2107,7 +2124,7 @@ impl PacketFinalClassification
  * Size: 1191 bytes
  * Version: 1
  */
-#[repr(C, packed)] // Size: 52 Bytes
+#[repr(C, packed)] // Size: 53 Bytes
 #[derive(Clone, Copy)]
 pub struct LobbyInfo
 {
@@ -2116,7 +2133,7 @@ pub struct LobbyInfo
     pub nationality: u8,        // Nationality of the driver
     pub name: [u8; 48],         // Name of participant in UTF-8 format – null terminated Will be truncated with ... (U+2026) if too long
     pub carNumber: u8,          // Car number of the player
-    pub readyStatus: ReadyStatus,
+    pub readyStatus: ReadyStatus,//u7 
 }
 
 impl LobbyInfo
@@ -2194,6 +2211,7 @@ impl ReadyStatus
     }
 }
 
+#[repr(C, packed)] // Size: 1191 Bytes
 #[derive(Debug, Clone, Copy)]
 pub struct PacketLobbyInfo
 {
@@ -2222,10 +2240,10 @@ impl PacketLobbyInfo
 
         for i in 0..22
         {
-            let start = i * size;
-            let end = start + size;
+            let s = i * size;
+            let e = s + size;
 
-            li[i] = LobbyInfo::unpack(&bytes[start..end]);
+            li[i] = LobbyInfo::unpack(&bytes[s..e]);
         }
 
         li
@@ -2239,7 +2257,7 @@ impl PacketLobbyInfo
  * Size: 948 bytes
  * Version: 1
  */
-#[repr(C, packed)] // Size: 43 Bytes
+#[repr(C, packed)] // Size: 42 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarDamage
 {
@@ -2272,31 +2290,32 @@ impl CarDamage
     {
         Self
         {
-                       tyresWear: Wheels::unpack(&bytes[0..17]),
-                     tyresDamage: [bytes[17], bytes[18], bytes[19], bytes[20]],
-                    brakesDamage: [bytes[21], bytes[22], bytes[23], bytes[24]],
-             frontLeftWingDamage: bytes[25],
-            frontRightWingDamage: bytes[26],
-                  rearWingDamage: bytes[27],
-                     floorDamage: bytes[28],
-                  diffuserDamage: bytes[29],
-                   sidepodDamage: bytes[30],
-                        drsFault: bytes[31],
-                        ersFault: bytes[32],
-                   gearBoxDamage: bytes[33],
-                    engineDamage: bytes[34],
-                  engineMGUHWear: bytes[35],
-                    engineESWear: bytes[36],
-                    engineCEWear: bytes[37],
-                   engineICEWear: bytes[38],
-                  engineMGUKWear: bytes[39],
-                    engineTCWear: bytes[40],
-                     engineBlown: bytes[41],
-                    engineSeized: bytes[42],
+                       tyresWear: Wheels::unpack(&bytes[0..16]),
+                     tyresDamage: [bytes[16], bytes[17], bytes[18], bytes[19]],
+                    brakesDamage: [bytes[20], bytes[21], bytes[22], bytes[23]],
+             frontLeftWingDamage: bytes[24],
+            frontRightWingDamage: bytes[25],
+                  rearWingDamage: bytes[26],
+                     floorDamage: bytes[27],
+                  diffuserDamage: bytes[28],
+                   sidepodDamage: bytes[29],
+                        drsFault: bytes[30],
+                        ersFault: bytes[31],
+                   gearBoxDamage: bytes[32],
+                    engineDamage: bytes[33],
+                  engineMGUHWear: bytes[34],
+                    engineESWear: bytes[35],
+                    engineCEWear: bytes[36],
+                   engineICEWear: bytes[37],
+                  engineMGUKWear: bytes[38],
+                    engineTCWear: bytes[39],
+                     engineBlown: bytes[40],
+                    engineSeized: bytes[41],
         }
     }
 }
 
+#[repr(C, packed)] // Size: 948 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarDamage
 {
@@ -2324,10 +2343,10 @@ impl PacketCarDamage
 
         for i in 0..22
         {
-            let start = i * size;
-            let end = start + size;
+            let s = i * size;
+            let e = s + size;
 
-            cd[i] = CarDamage::unpack(&bytes[start..end]);
+            cd[i] = CarDamage::unpack(&bytes[s..e]);
         }
 
         cd
@@ -2386,7 +2405,7 @@ pub struct LapHistory
     pub sector1TimeInMS: u16,           // Sector 1 time in milliseconds
     pub sector2TimeInMS: u16,           // Sector 2 time in milliseconds
     pub sector3TimeInMS: u16,           // Sector 3 time in milliseconds
-    pub lapValidBitFlags: Valid,        // 0x01 bit set-lap valid, 0x02 bit set-sector 1 valid 0x04 bit set-sector 2 valid, 0x08 bit set-sector 3 valid
+    pub lapValidBitFlags: Valid,        // u8 - 0x01 bit set-lap valid, 0x02 bit set-sector 1 valid 0x04 bit set-sector 2 valid, 0x08 bit set-sector 3 valid
 }
 
 impl LapHistory
@@ -2424,6 +2443,7 @@ impl TyreStintHistory
     }
 }
 
+#[repr(C, packed)] // Size: 1155 Bytes
 #[derive(Debug, Clone, Copy)]
 pub struct PacketSessionHistory
 {
@@ -2438,8 +2458,8 @@ pub struct PacketSessionHistory
     pub bestSector2LapNum: u8,  // Lap the best Sector 2 time was achieved on
     pub bestSector3LapNum: u8,  // Lap the best Sector 3 time was achieved on
 
-    pub lapHistory: [LapHistory; 100], // 100 laps of data max
-    pub tyreStintsHistory: [TyreStintHistory; 8],
+    pub lapHistory: [LapHistory; 100], // 11 Bytes * 100 - 100 laps of data max
+    pub tyreStintsHistory: [TyreStintHistory; 8], // 3 Bytes * 8
 }
 
 impl PacketSessionHistory
@@ -2468,10 +2488,10 @@ impl PacketSessionHistory
 
         for i in 0..100
         {
-            let start = i * size;
-            let end   = start + size;
+            let s = i * size;
+            let e = s + size;
 
-            lh[i] = LapHistory::unpack(&bytes[start..end]);
+            lh[i] = LapHistory::unpack(&bytes[s..e]);
         }
 
         lh
@@ -2485,10 +2505,10 @@ impl PacketSessionHistory
 
         for i in 0..8
         {
-            let start = i * size;
-            let end   = start + size;
+            let s = i * size;
+            let e = s + size;
 
-            tsh[i] = TyreStintHistory::unpack(&bytes[start..end]);
+            tsh[i] = TyreStintHistory::unpack(&bytes[s..e]);
         }
 
         tsh
