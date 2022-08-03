@@ -916,6 +916,7 @@ impl Driver {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum ResultStatus {
+    #[default]
     Invalid = 0,
     Inactive = 1,
     Active = 2,
@@ -924,8 +925,6 @@ pub enum ResultStatus {
     Disqualified = 5,
     NotClassified = 6,
     Retired = 7,
-    #[default]
-    Poisoned = 255,
 }
 
 impl ResultStatus {
@@ -941,7 +940,7 @@ impl ResultStatus {
             5 => ResultStatus::Disqualified,
             6 => ResultStatus::NotClassified,
             7 => ResultStatus::Retired,
-            _ => ResultStatus::Poisoned,
+            _ => ResultStatus::Invalid,
         }
     }
 }
@@ -1015,6 +1014,7 @@ pub union EventDetails
     pub stopGoPenaltyServed: StopGoPenaltyServed,
     pub flashback: Flashback,
     pub buttons: Buttons,
+    pub unknownTag: [u8; 4]
 }
 
 #[repr(C, packed)]
@@ -1231,41 +1231,140 @@ impl Buttons
     }
 }
 
+#[repr(C, packed)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct EventTag
+{
+    pub tag: [u8; 4]
+}
+
+impl EventTag
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            tag: [bytes[0], bytes[1], bytes[2], bytes[3]]
+        }
+    }
+
+    pub fn to_str(&self) -> &str
+    {
+        match &self.tag
+        {
+            b"SSTA" => "SSTA",
+            b"SEND" => "SEND",
+            b"FTLP" => "FTLP",
+            b"RTMT" => "RTMT",
+            b"DRSE" => "DRSE",
+            b"DRSD" => "DRSD",
+            b"TMPT" => "TMPT",
+            b"CHQF" => "CHQF",
+            b"RCWN" => "RCWN",
+            b"PENA" => "PENA",
+            b"SPTP" => "SPTP",
+            b"STLG" => "STLG",
+            b"LGOT" => "LGOT",
+            b"DTSV" => "DTSV",
+            b"SGSV" => "SGSV",
+            b"FLBK" => "FLBK",
+            b"BUTN" => "BUTN",
+            _ => todo!(),
+        }
+
+    }
+}
+
 #[repr(C, packed)] // Size: 24 + 8 + (Depends) Bytes
 #[derive(Clone, Copy)]
 pub struct PacketEvent
 {
     pub header: Header,                 // 24 Bytes - Header
 
-    pub eventStringCode: [u8; 4],       // Event string code, see below
-    pub eventDetails: EventDetails,     // Event details - should be interpreted differently for each type
+    pub eventStringCode: EventTag,      // u8 * 4 - Event string code, see below
+    pub eventDetails: EventDetails,     // Depends - Event details - should be interpreted differently for each type
 }
 
-/**
- * # Event String Codes
- */
-#[repr(u32)]
-#[derive(Debug, Default, Clone, Copy)]
-pub enum EventStringCode
+impl fmt::Debug for PacketEvent
 {
-    #[default]
-    SessionStarted = 0x83838465,            // "SSTA" Sent when the session starts
-    SessionEnded = 0x83697868,              // "SEND" Sent when the session ends
-    FastestLap = 0x70857680,                // "FTLP" When a driver achieves the fastest lap
-    Retirement = 0x82847784,                // "RTMT" When a driver retires
-    DRSenabled = 0x68828369,                // "DRSE" Race control have enabled DRS
-    DRSdisabled = 0x68828368,               // "DRSD" Race control have disabled DRS
-    TeamMateInPits = 0x84778084,            // "TMPT" Your team mate has entered the pits
-    ChequeredFlag = 0x67728170,             // "CHQF" The chequered flag has been waved
-    RaceWinner = 0x82678778,                // "RCWN" The race winner is announced
-    Penalty = 0x80697865,                   // "PENA" A penalty has been issued – details in event
-    SpeedTrap = 0x83808480,                 // "SPTP" Speed trap has been triggered by fastest speed
-    StartLights = 0x83847671,               // "STLG" Start lights – number shown
-    LightsOut = 0x76717984,                 // "LGOT" Lights out
-    DriveThroughPenaltyServed = 0x68848386, // "DTSV" Drive through penalty served
-    StopGoPenaltyServed = 0x83717386,       // "SGSV" Stop go penalty served
-    Flashback = 0x70766675,                 // "FLBK" Flashback activated
-    Buttons = 0x66858478,                   // "BUTN" Button status changed
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PacketEvent")
+         .field(         "header", &self.header)
+         .field("eventStringCode", &std::str::from_utf8(&self.eventStringCode.tag).unwrap().trim_end_matches('\0'))
+         .field(   "eventDetails", &"God Only Knows")
+         .finish()
+    }
+}
+
+impl PacketEvent
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        let eventTag: EventTag = EventTag::unpack(&bytes[24..28]);
+
+        Self {
+            header: Header::unpack(&bytes),
+
+            eventStringCode: eventTag,
+            eventDetails: match &eventTag.tag {
+//                b"SSTA" => SessionStarted::unpack(&bytes[28..]),            // Sent when the session starts
+//                b"SEND" => SessionEnded::unpack(&bytes[28..]),              // Sent when the session ends
+                b"FTLP" => EventDetails {
+                        // When a driver achieves the fastest lap
+                        fastestLap: FastestLap::unpack(&bytes[28..])
+                    },
+                b"RTMT" => EventDetails {
+                        // When a driver retires
+                        retirement: Retirement::unpack(&bytes[28..])
+                    },
+//                b"DRSE" => DRSenabled::unpack(&bytes[28..]),                // Race control have enabled DRS
+//                b"DRSD" => DRSdisabled::unpack(&bytes[28..]),               // Race control have disabled DRS
+                b"TMPT" => EventDetails {
+                        // Your team mate has entered the pits
+                        teamMateInPits: TeamMateInPits::unpack(&bytes[28..])
+                    },
+//                b"CHQF" => ChequeredFlag::unpack(&bytes[28..]),             // The chequered flag has been waved
+                b"RCWN" => EventDetails {
+                        // The race winner is announced
+                        raceWinner: RaceWinner::unpack(&bytes[28..])
+                    },
+                b"PENA" => EventDetails {
+                        // A penalty has been issued – details in event
+                        penalty: Penalty::unpack(&bytes[28..])
+                    },
+                b"SPTP" => EventDetails {
+                        // Speed trap has been triggered by fastest speed
+                        speedTrap: SpeedTrap::unpack(&bytes[28..])
+                    },
+                b"STLG" => EventDetails {
+                        // Start lights – number shown
+                        startLights: StartLights::unpack(&bytes[28..])
+                    },
+//                b"LGOT" => LightsOut::unpack(&bytes[28..]),                 // Lights out
+                b"DTSV" => EventDetails {
+                        // Drive through penalty served
+                        driveThroughPenaltyServed: DriveThroughPenaltyServed::unpack(&bytes[28..])
+                    },
+                b"SGSV" => EventDetails {
+                        // Stop go penalty served
+                        stopGoPenaltyServed: StopGoPenaltyServed::unpack(&bytes[28..])
+                    },
+                b"FLBK" => EventDetails {
+                        // Flashback activated
+                        flashback: Flashback::unpack(&bytes[28..])
+                    },
+                b"BUTN" => EventDetails {
+                        // Button status changed
+                        buttons: Buttons::unpack(&bytes[28..])
+                    },
+                _ => {
+                    println!("Unhandled Event: {}", eventTag.to_str());
+                    EventDetails {
+                        unknownTag: eventTag.tag
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -1452,14 +1551,14 @@ impl CarSetup
 
 #[repr(C, packed)] // Size: 1102 Bytes
 #[derive(Debug, Default, Clone, Copy)]
-pub struct PacketCarSetup
+pub struct PacketCarSetups
 {
     pub header: Header,                 // 24 Bytes - Header
 
     pub carSetups: [CarSetup; 22],
 }
 
-impl PacketCarSetup
+impl PacketCarSetups
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
