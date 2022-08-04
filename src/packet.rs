@@ -811,7 +811,10 @@ pub enum TimeInMS
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TimeLong
 {
-    pub TimeInMS: u32
+    pub TimeInMS: u32,
+    // Drived Information
+    pub isPB: bool,                     // Personal Best
+    pub isOB: bool,                     // Overall Best
 }
 
 impl TimeLong
@@ -820,7 +823,10 @@ impl TimeLong
     {
         Self
         {
-            TimeInMS: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+            TimeInMS: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            // Drived Information
+            isPB: false,
+            isOB: false,
         }
     }
 }
@@ -836,7 +842,10 @@ impl fmt::Display for TimeLong
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TimeShort
 {
-    pub TimeInMS: u16
+    pub TimeInMS: u16,
+    // Drived Information
+    pub isPB: bool,                     // Personal Best
+    pub isOB: bool,                     // Overall Best
 }
 
 impl TimeShort
@@ -845,7 +854,9 @@ impl TimeShort
     {
         Self
         {
-            TimeInMS: u16::from_le_bytes([bytes[0], bytes[1]])
+            TimeInMS: u16::from_le_bytes([bytes[0], bytes[1]]),
+            isPB: false,
+            isOB: false,
         }
     }
 }
@@ -861,30 +872,30 @@ impl fmt::Display for TimeShort
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Lap
 {
-    pub lastLapTimeInMS: TimeLong,      // Last lap time in milliseconds
-    pub currentLapTimeInMS: TimeLong,   // Current time around the lap in milliseconds
-    pub sector1TimeInMS: TimeShort,     // Sector 1 time in milliseconds
-    pub sector2TimeInMS: TimeShort,     // Sector 2 time in milliseconds
-    pub lapDistance: f32,               // Distance vehicle is around current lap in metres – could be negative if line hasn’t been crossed yet
-    pub totalDistance: f32,             // Total distance travelled in session in metres – could be negative if line hasn’t been crossed yet
-    pub safetyCarDelta: f32,            // Delta in seconds for safety car
-    pub carPosition: u8,                // Car race position
-    pub currentLapNum: u8,              // Current lap number
-    pub pitStatus: PitStatus,           // u8
-    pub numPitStops: u8,                // Number of pit stops taken in this race
-    pub sector: u8,                     // 0 = sector1, 1 = sector2, 2 = sector3
-    pub currentLapInvalid: u8,          // Current lap invalid - 0 = valid, 1 = invalid
-    pub penalties: u8,                  // Accumulated time penalties in seconds to be added
-    pub warnings: u8,                   // Accumulated number of warnings issued
-    pub numUnservedDriveThroughPens: u8,// Num drive through pens left to serve
-    pub numUnservedStopGoPens: u8,      // Num stop go pens left to serve
-    pub gridPosition: u8,               // Grid position the vehicle started the race in
-    pub driverStatus: Driver,           // u8
-    pub resultStatus: ResultStatus,     // u8
-    pub pitLaneTimerActive: u8,         // Pit lane timing, 0 = inactive, 1 = active
-    pub pitLaneTimeInLaneInMS: TimeShort,// If active, the current time spent in the pit lane in ms
-    pub pitStopTimerInMS: TimeShort,    // Time of the actual pit stop in ms
-    pub pitStopShouldServePen: u8,      // Whether the car should serve a penalty at this stop
+    pub lastLapTimeInMS: TimeLong,          // u32 Last lap time in milliseconds
+    pub currentLapTimeInMS: TimeLong,       // u32 Current time around the lap in milliseconds
+    pub sector1TimeInMS: TimeShort,         // u16 Sector 1 time in milliseconds
+    pub sector2TimeInMS: TimeShort,         // u16 Sector 2 time in milliseconds
+    pub lapDistance: f32,                   // Distance vehicle is around current lap in metres – could be negative if line hasn’t been crossed yet
+    pub totalDistance: f32,                 // Total distance travelled in session in metres – could be negative if line hasn’t been crossed yet
+    pub safetyCarDelta: f32,                // Delta in seconds for safety car
+    pub carPosition: u8,                    // Car race position
+    pub currentLapNum: u8,                  // Current lap number
+    pub pitStatus: PitStatus,               // u8
+    pub numPitStops: u8,                    // Number of pit stops taken in this race
+    pub sector: u8,                         // 0 = sector1, 1 = sector2, 2 = sector3
+    pub currentLapInvalid: u8,              // Current lap invalid - 0 = valid, 1 = invalid
+    pub penalties: u8,                      // Accumulated time penalties in seconds to be added
+    pub warnings: u8,                       // Accumulated number of warnings issued
+    pub numUnservedDriveThroughPens: u8,    // Num drive through pens left to serve
+    pub numUnservedStopGoPens: u8,          // Num stop go pens left to serve
+    pub gridPosition: u8,                   // Grid position the vehicle started the race in
+    pub driverStatus: CarState,             // u8
+    pub resultStatus: ResultStatus,         // u8
+    pub pitLaneTimerActive: u8,             // Pit lane timing, 0 = inactive, 1 = active
+    pub pitLaneTimeInLaneInMS: TimeShort,   // u16 If active, the current time spent in the pit lane in ms
+    pub pitStopTimerInMS: TimeShort,        // u16 Time of the actual pit stop in ms
+    pub pitStopShouldServePen: u8,          // Whether the car should serve a penalty at this stop
 }
 
 impl Lap
@@ -910,7 +921,7 @@ impl Lap
             numUnservedDriveThroughPens: bytes[32],
             numUnservedStopGoPens      : bytes[33],
             gridPosition               : bytes[34],
-            driverStatus               : Driver::from_u8(bytes[35]),
+            driverStatus               : CarState::from_u8(bytes[35]),
             resultStatus               : ResultStatus::from_u8(bytes[36]),
             pitLaneTimerActive         : bytes[37],
             pitLaneTimeInLaneInMS      : TimeShort::unpack(&bytes[38..40]),
@@ -946,7 +957,7 @@ impl PitStatus
 
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
-pub enum Driver {
+pub enum CarState {
     InGarage = 0,
     OnFlyingLap = 1,
     InLap = 2,
@@ -956,17 +967,17 @@ pub enum Driver {
     Poisoned = 255,
 }
 
-impl Driver {
+impl CarState {
     pub fn from_u8(byte: u8) -> Self
     {
         match byte
         {
-            0 => Driver::InGarage,
-            1 => Driver::OnFlyingLap,
-            2 => Driver::InLap,
-            3 => Driver::OutLap,
-            4 => Driver::OnTrack,
-            _ => Driver::Poisoned,
+            0 => CarState::InGarage,
+            1 => CarState::OnFlyingLap,
+            2 => CarState::InLap,
+            3 => CarState::OutLap,
+            4 => CarState::OnTrack,
+            _ => CarState::Poisoned,
         }
     }
 }
@@ -1022,7 +1033,7 @@ impl PacketLap
         Self {
             header: Header::unpack(&bytes),
 
-            laps: Self::lap(&bytes[24..970]),
+            laps: Self::lap(&bytes[24..24+43*22]),
 
             timeTrialPBCarIdx: bytes[970],
             timeTrialRivalCarIdx: bytes[971],
@@ -1033,7 +1044,7 @@ impl PacketLap
     {
         let mut l = [Lap::default(); 22];
 
-        let size = size_of::<Lap>();
+        let size = 43;
 
         for i in 0..22
         {
@@ -2694,9 +2705,8 @@ impl PacketSessionHistory
             bestSector1LapNum: bytes[28],
             bestSector2LapNum: bytes[29],
             bestSector3LapNum: bytes[30],
-            lapHistory       : Self::lapHistory(&bytes[31..1131]),
-            tyreStintsHistory: Self::tyreStintHistory(&bytes[1131..]),
-        }
+            lapHistory       : Self::lapHistory(&bytes[(size_of::<Header>()+7)..(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)]),
+            tyreStintsHistory: Self::tyreStintHistory(&bytes[(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)..(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)+(size_of::<TyreStintHistory>()*8)]),        }
     }
 
     pub fn lapHistory(bytes: &[u8]) -> [LapHistory; 100]
