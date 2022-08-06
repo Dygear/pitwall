@@ -169,11 +169,25 @@ struct BestSector {
     pub onLap: u8,                      // PacketLap.laps.currentLapNum
 }
 
+impl fmt::Display for BestSector
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.3}", self.time.TimeInMS as f32 / 1000 as f32)
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 struct BestLap {
     pub time: TimeLong,                 // MIN of PacketLap.laps.{lastLapTimeInMS}
     pub byId: u8,                       // Driver Index Number
     pub onLap: u8,                      // PacketLap.laps.currentLapNum
+}
+
+impl fmt::Display for BestLap
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.3}", self.time.TimeInMS as f32 / 1000 as f32)
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -341,7 +355,53 @@ fn main() {
                     }
 
                     // Update Best Sectors
+                    match page.cars[idx].sector
+                    {
+                        1 => {
+                            // Check Sector 3 Time & Last Lap
+                            if page.bests.sector3.time > page.cars[idx].time.sector3
+                            {
+                                page.bests.sector3 = BestSector {
+                                    time: page.cars[idx].time.sector3,
+                                    byId: i,
+                                    onLap: l.laps[idx].currentLapNum - 1
+                                }
+                            }
 
+                            // Last Lap
+                            if page.bests.lapTime.time > page.cars[idx].time.lastLap
+                            {
+                                page.bests.lapTime = BestLap {
+                                    time: page.cars[idx].time.lastLap,
+                                    byId: i,
+                                    onLap: l.laps[idx].currentLapNum - 1
+                                }
+                            }
+                        },
+                        2 => {
+                            // Check Sector 1 Time
+                            if page.bests.sector1.time > page.cars[idx].time.sector1
+                            {
+                                page.bests.sector1 = BestSector {
+                                    time: page.cars[idx].time.sector1,
+                                    byId: i,
+                                    onLap: l.laps[idx].currentLapNum
+                                }
+                            }
+                        },
+                        3 => {
+                            // Check Sector 2 Time
+                            if page.bests.sector2.time > page.cars[idx].time.sector2
+                            {
+                                page.bests.sector2 = BestSector {
+                                    time: page.cars[idx].time.sector2,
+                                    byId: i,
+                                    onLap: l.laps[idx].currentLapNum
+                                }
+                            }
+                        },
+                        _ => {}
+                    }
 
                     // Now update the remaining new informaiton.
                     page.cars[idx].spotGrid                 = l.laps[idx].gridPosition;
@@ -385,6 +445,21 @@ fn main() {
                 status      = "Status",
             );
 
+        // Bests
+            println!(
+                "{spotRace:2} {driver:>24} {bestLapTime:>7} | {bestSector1:>7} {bestSector2:>7} {bestSector3:>7} | {theoCurrent:>7} {laps:>4} {tyre:>4} {status}",
+                spotRace    = "",
+                driver      = "",
+                bestLapTime = page.bests.lapTime,
+                bestSector1 = page.bests.sector1,
+                bestSector2 = page.bests.sector1,
+                bestSector3 = page.bests.sector1,
+                theoCurrent = "Time",
+                laps        = "Laps",
+                tyre        = "Tyre",
+                status      = "Status",
+            );
+
         // Drivers
         for i in 1..21
         {
@@ -399,11 +474,12 @@ fn main() {
                 timeSector3 = format!("{}", page.cars[p].time.sector3),
                 timeCurrent = format!("{}", page.cars[p].time.current),
                 laps        = page.cars[p].lapNum,
-                tyre        = page.cars[p].tyres.actual,
+                tyre        = page.cars[p].tyres,
                 status      = page.cars[p].carStatus
             );
         }
 
+        // Footer
         println!("");
 
     }

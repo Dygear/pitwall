@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 use colored::Colorize;
+use std::cmp::Ordering;
 use std::mem::size_of;
 use std::fmt;
 
@@ -831,6 +832,25 @@ impl TimeLong
     }
 }
 
+impl PartialOrd for TimeLong
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering>
+    {
+        // Unaligned Memory Access Fix.
+        let this = self.TimeInMS;
+        let time = other.TimeInMS;
+        this.partial_cmp(&time)
+    }
+}
+
+impl PartialEq for TimeLong
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        self.TimeInMS == other.TimeInMS
+    }
+}
+
 impl fmt::Display for TimeLong
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -858,6 +878,25 @@ impl TimeShort
             isPB: false,
             isOB: false,
         }
+    }
+}
+
+impl PartialOrd for TimeShort
+{
+    // Unaligned Memory Access Fix.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering>
+    {
+        let this = self.TimeInMS;
+        let time = other.TimeInMS;
+        this.partial_cmp(&time)
+    }
+}
+
+impl PartialEq for TimeShort
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        self.TimeInMS == other.TimeInMS
     }
 }
 
@@ -2069,21 +2108,21 @@ impl fmt::Display for ActualCompound {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self
         {
-                     C1 => write!(f, "C1"),
-                     C2 => write!(f, "C2"),
-                     C3 => write!(f, "C3"),
-                     C4 => write!(f, "C4"),
-                     C5 => write!(f, "C5"),
-                  F2Wet => write!(f, "W"),
-                 F2Hard => write!(f, "H"),
-               F2Medium => write!(f, "M"),
-                 F2Soft => write!(f, "S"),
-            F2SuperSoft => write!(f, "S"),
-            ClassicWet  => write!(f, "W"),
-            ClassicDry  => write!(f, "D"),
-                   Wet  => write!(f, "W"),
-                 Inter  => write!(f, "I"),
-                      _ => write!(f, ""),
+                     ActualCompound::C1 => write!(f, "C1"),
+                     ActualCompound::C2 => write!(f, "C2"),
+                     ActualCompound::C3 => write!(f, "C3"),
+                     ActualCompound::C4 => write!(f, "C4"),
+                     ActualCompound::C5 => write!(f, "C5"),
+                  ActualCompound::F2Wet => write!(f, "W"),
+                 ActualCompound::F2Hard => write!(f, "H"),
+               ActualCompound::F2Medium => write!(f, "M"),
+                 ActualCompound::F2Soft => write!(f, "S"),
+            ActualCompound::F2SuperSoft => write!(f, "S"),
+            ActualCompound::ClassicWet  => write!(f, "W"),
+            ActualCompound::ClassicDry  => write!(f, "D"),
+                   ActualCompound::Wet  => write!(f, "W"),
+                 ActualCompound::Inter  => write!(f, "I"),
+                                      _ => write!(f, ""),
         }
     }
 }
