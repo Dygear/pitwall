@@ -1021,6 +1021,21 @@ impl CarState {
     }
 }
 
+impl fmt::Display for CarState
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self
+        {
+            CarState::InGarage    => write!(f, "Pits"),
+            CarState::OnFlyingLap => write!(f, "Fast"),
+            CarState::InLap       => write!(f, "In"),
+            CarState::OutLap      => write!(f, "Out"),
+            CarState::OnTrack     => write!(f, "Race"),
+            _                     => write!(f, "?")
+        }
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum ResultStatus {
@@ -1732,6 +1747,13 @@ impl KPH {
     }
 }
 
+impl fmt::Display for KPH
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.kph)
+    }
+}
+
 #[repr(i8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Gear
@@ -1767,6 +1789,26 @@ impl Gear
              7 => Gear::Seventh,
              8 => Gear::Eighth,
              _ => Gear::Poisoned,
+        }
+    }
+}
+
+impl fmt::Display for Gear
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self
+        {
+            Gear::Reverse  => write!(f, "R"),
+            Gear::Neutral  => write!(f, "N"),
+            Gear::First    => write!(f, "1"),
+            Gear::Second   => write!(f, "2"),
+            Gear::Third    => write!(f, "3"),
+            Gear::Forth    => write!(f, "4"),
+            Gear::Fifth    => write!(f, "5"),
+            Gear::Sixth    => write!(f, "6"),
+            Gear::Seventh  => write!(f, "7"),
+            Gear::Eighth   => write!(f, "8"),
+            Gear::Poisoned => write!(f, "?"),
         }
     }
 }
@@ -2118,10 +2160,10 @@ impl fmt::Display for ActualCompound {
                ActualCompound::F2Medium => write!(f, "M"),
                  ActualCompound::F2Soft => write!(f, "S"),
             ActualCompound::F2SuperSoft => write!(f, "S"),
-            ActualCompound::ClassicWet  => write!(f, "W"),
-            ActualCompound::ClassicDry  => write!(f, "D"),
-                   ActualCompound::Wet  => write!(f, "W"),
-                 ActualCompound::Inter  => write!(f, "I"),
+             ActualCompound::ClassicWet => write!(f, "W"),
+             ActualCompound::ClassicDry => write!(f, "D"),
+                    ActualCompound::Wet => write!(f, "W"),
+                  ActualCompound::Inter => write!(f, "I"),
                                       _ => write!(f, ""),
         }
     }
@@ -2160,6 +2202,25 @@ impl VisualCompound {
              8 => VisualCompound::Wet,
              7 => VisualCompound::Inter,
              _ => VisualCompound::Poisoned,
+        }
+    }
+}
+
+impl fmt::Display for VisualCompound {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self
+        {
+            VisualCompound::OldHard      => write!(f, "H"),
+            VisualCompound::OldMedium    => write!(f, "M"),
+            VisualCompound::OldSoft      => write!(f, "SS"),
+            VisualCompound::OldSuperSoft => write!(f, "P"),
+            VisualCompound::Hard         => write!(f, "H"),
+            VisualCompound::Soft         => write!(f, "S"),
+            VisualCompound::Medium       => write!(f, "M"),
+            VisualCompound::OldWet       => write!(f, "W"),
+            VisualCompound::Wet          => write!(f, "W"),
+            VisualCompound::Inter        => write!(f, "I"),
+                                       _ => write!(f, "?"),
         }
     }
 }
