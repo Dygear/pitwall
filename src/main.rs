@@ -2,6 +2,7 @@
 
 use std::net::UdpSocket;
 use colored::*;
+use std::fmt;
 
 mod packet;
 use packet::*;
@@ -24,89 +25,174 @@ enum Packet
 }
 
 #[derive(Debug, Default, Clone)]
-struct Info
+struct Driver
 {
     // From PacketParticipants.participants
-    pub aiControlled: bool,             // aiControlled
-    pub driverId: u8,                   // driverId
-    pub networkId: u8,                  // networkId
-    pub teamId: u8,                     // teamId
-    pub teamIsCustom: bool,             // myTeam
-    pub carNumber: u8,                  // raceNumber
-    pub driverNationality: u8,          // nationality
-    pub driverName: String,             // name
-    pub driverTelemetry: bool,          // yourTelemetry
+    pub id: u8,                         // driverId
+    pub idNetwork: u8,                  // networkId
+    pub number: u8,                     // raceNumber
+    pub nationality: u8,                // nationality
+    pub isAI: bool,                     // aiControlled
+    pub isTelemetryEnabled: bool,       // yourTelemetry
+    pub name: String,                   // name
+}
+
+impl Driver
+{
+    pub fn getDriver(&self) -> String
+    {
+        format!(
+            "{} ({:2})",
+            if self.isAI { self.name.white() } else { self.name.yellow() },
+            self.number,
+        )
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+struct Team
+{
+    // From PacketParticipants.participants
+    pub id: u8,                         // teamId
+    pub isCustom: bool,                 // myTeam
+}
+
+#[derive(Debug, Default, Clone)]
+struct DRS
+{
     // PacketCarTelemetry.carTelemetryData
-    pub isDRSOpen: bool,                // drs
+    pub isOpen: bool,                   // drs
+    // PacketCarStatus.carStatusData
+    pub isAllowed: bool,                // drsAllowed
+}
+
+#[derive(Debug, Default, Clone)]
+struct Assists
+{
+    // PacketCarStatus.carStatusData
+    pub TC: TC,                         // tractionControl
+    pub ABS: Assist,                    // antiLockBrakes
+}
+
+#[derive(Debug, Default, Clone)]
+struct Tyres
+{
+    // PacketCarStatus.carStatusData
+    pub actual: ActualCompound,         // actualTyre
+    pub visual: VisualCompound,         // visualTyre
+    pub age: u8,                        // tyresAgeLaps
+}
+
+impl fmt::Display for Tyres
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let esc = 27 as char;
+        let reset    = "[0m";
+        let _black   = "[30m";
+        let red      = "[31m";
+        let green    = "[32m";
+        let yellow   = "[33m";
+        let blue     = "[34m";
+        let magenta  = "[35m";
+        let _cyan    = "[36m";
+        let white    = "[37m";
+
+        match self.visual
+        {
+            VisualCompound::OldHard     | VisualCompound::Hard   => write!(f, "{esc}{}({}){esc}{reset}", white  , self.actual),
+            VisualCompound::OldMedium   | VisualCompound::Medium => write!(f, "{esc}{}({}){esc}{reset}", yellow , self.actual),
+            VisualCompound::OldSoft     | VisualCompound::Soft   => write!(f, "{esc}{}({}){esc}{reset}", red    , self.actual),
+            VisualCompound::OldSuperSoft                         => write!(f, "{esc}{}({}){esc}{reset}", magenta, self.actual),
+            VisualCompound::Inter                                => write!(f, "{esc}{}({}){esc}{reset}", green  , self.actual),
+            VisualCompound::OldWet      | VisualCompound::Wet    => write!(f, "{esc}{}({}){esc}{reset}", blue   , self.actual),
+                                                               _ => write!(f, "{}", self.actual)
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+struct Telemetry
+{
+    // PacketCarTelemetry.carTelemetryData
     pub speed: KPH,                     // speed
     pub gear: Gear,                     // gear
     pub rpm: u16,                       // engineRPM
     pub leds: RevLights,                // revLightsBitValue
+}
+
+#[derive(Debug, Default, Clone)]
+struct Time
+{
+    // PacketLap.laps
+    pub sector1: TimeShort,             // sector1TimeInMS
+    pub sector2: TimeShort,             // sector2TimeInMS
+    pub sector3: TimeShort,             // sector2TimeInMS
+    pub lastLap: TimeLong,              // lastLapTimeInMS
+    pub current: TimeLong,              // currentLapTimeInMS
+}
+
+#[derive(Debug, Default, Clone)]
+struct Car
+{
+    pub driver: Driver,
+    pub team: Team,
+    pub DRS: DRS,
+    pub assist: Assists,
+    pub tyres: Tyres,
+    pub telemetry: Telemetry,
+    pub time: Time,
+
     // PacketCarStatus.carStatusData
-    pub isDRSAllowed: bool,             // drsAllowed
-    pub assistTC: TC,                   // tractionControl
-    pub assistABS: Assist,              // antiLockBrakes
-    pub tyreActual: ActualCompound,     // actualTyre
-    pub tyreVisual: VisualCompound,     // visualTyre
-    pub tyreAge: u8,                    // tyresAgeLaps
     pub underFlag: ZoneFlag,            // vehicleFiaFlags
+
     // PacketLap.laps
     pub spotGrid: u8,                   // gridPosition
     pub spotRace: u8,                   // carPosition
     pub lapNum: u8,                     // currentLapNum
     pub pitCount: u8,                   // numPitStops
-    pub carStatus: Driver,              // driverStatus
+    pub carStatus: CarState,            // driverStatus
     pub sector: u8,                     // sector
-    pub timeSector1: TimeShort,         // sector1TimeInMS
-    pub timeSector2: TimeShort,         // sector2TimeInMS
-    pub timeCurrent: TimeLong,          // currentLapTimeInMS
-    pub timeLastLap: TimeLong,          // lastLapTimeInMS
+
 }
-/**
+
 #[derive(Debug, Default, Clone, Copy)]
-struct Laps {
-    lead: u8,                           // MAX of PacketLap.laps.currentLapNum
-    total: u8,                          // PacketSession.totalLaps
+struct Lap {
+    pub leader: u8,                     // MAX of PacketLap.laps.currentLapNum
+    pub total: u8,                      // PacketSession.totalLaps
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 struct BestSector {
     pub time: TimeShort,                // MIN of PacketLap.laps.{sector1TimeInMS,sector2TimeInMS} Calc of sector3TimeInMS
+    pub byId: u8,                       // Driver Index Number
     pub onLap: u8,                      // PacketLap.laps.currentLapNum
-    pub by: u8,                         // Driver Index Number
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 struct BestLap {
     pub time: TimeLong,                 // MIN of PacketLap.laps.{lastLapTimeInMS}
+    pub byId: u8,                       // Driver Index Number
     pub onLap: u8,                      // PacketLap.laps.currentLapNum
-    pub by: u8,                         // Driver Index Number
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 struct Bests {
-    pub One: BestSector,
-    pub Two: BestSector,
-    pub Three: BestSector,
-    pub Lap: BestLap,
+    pub sector1: BestSector,
+    pub sector2: BestSector,
+    pub sector3: BestSector,
+    pub lapTime: BestLap,
 }
-*/
+
 #[derive(Debug, Default, Clone)]
 struct Page
 {
-    drivers: [Info; 22],
     participants: u8,                   // PacketParticipants.numActiveCars
-    r#type: Session,                    // PacketSession.sessionType
     positions: [u8; 22],
-//    lap: Laps,
-//    best: Bests
-}
-
-impl std::fmt::Display for Page
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Format: {})", self.drivers.len())
-    }
+    r#type: Session,                    // PacketSession.sessionType
+    bests: Bests,
+    cars: [Car; 22],
+    lap: Lap,
 }
 
 fn main() {
@@ -183,60 +269,91 @@ fn main() {
             Packet::Session(session) => {
                 page.r#type = session.sessionType;
             }
-            Packet::Participants(people) => {
-                page.participants = people.numActiveCars;
+            Packet::Participants(p) => {
+                page.participants = p.numActiveCars;
 
                 for i in 0..22
                 {
-                    page.drivers[i as usize].aiControlled      = people.participants[i as usize].aiControlled == 1;
-                    page.drivers[i as usize].driverId          = people.participants[i as usize].driverId;
-                    page.drivers[i as usize].networkId         = people.participants[i as usize].networkId;
-                    page.drivers[i as usize].teamId            = people.participants[i as usize].teamId;
-                    page.drivers[i as usize].teamIsCustom      = people.participants[i as usize].myTeam == 1;
-                    page.drivers[i as usize].carNumber         = people.participants[i as usize].raceNumber;
-                    page.drivers[i as usize].driverNationality = people.participants[i as usize].nationality;
-                    page.drivers[i as usize].driverName        = people.participants[i as usize].name_to_string();
-                    page.drivers[i as usize].driverTelemetry   = people.participants[i as usize].yourTelemetry == 1;
+                    let idx = i as usize;
+
+                    page.cars[idx].driver.isAI               = p.participants[idx].aiControlled == 1;
+                    page.cars[idx].driver.id                 = p.participants[idx].driverId;
+                    page.cars[idx].driver.idNetwork          = p.participants[idx].networkId;
+                    page.cars[idx].team.id                   = p.participants[idx].teamId;
+                    page.cars[idx].team.isCustom             = p.participants[idx].myTeam == 1;
+                    page.cars[idx].driver.number             = p.participants[idx].raceNumber;
+                    page.cars[idx].driver.nationality        = p.participants[idx].nationality;
+                    page.cars[idx].driver.name               = p.participants[idx].name_to_string();
+                    page.cars[idx].driver.isTelemetryEnabled = p.participants[idx].yourTelemetry == 1;
                 }
             }
-            Packet::CarTelemetry(telemetry) => {
+            Packet::CarTelemetry(t) => {
                 for i in 0..22
                 {
-                    page.drivers[i as usize].isDRSOpen = telemetry.carTelemetry[i as usize].drs == 1;
-                    page.drivers[i as usize].speed     = telemetry.carTelemetry[i as usize].speed;
-                    page.drivers[i as usize].gear      = telemetry.carTelemetry[i as usize].gear;
-                    page.drivers[i as usize].rpm       = telemetry.carTelemetry[i as usize].engineRPM;
-                    page.drivers[i as usize].leds      = telemetry.carTelemetry[i as usize].revLightsBitValue;
+                    let idx = i as usize;
+
+                    page.cars[idx].DRS.isOpen                = t.carTelemetry[idx].drs == 1;
+                    page.cars[idx].telemetry.speed           = t.carTelemetry[idx].speed;
+                    page.cars[idx].telemetry.gear            = t.carTelemetry[idx].gear;
+                    page.cars[idx].telemetry.rpm             = t.carTelemetry[idx].engineRPM;
+                    page.cars[idx].telemetry.leds            = t.carTelemetry[idx].revLightsBitValue;
                 }
 
             }
-            Packet::CarStatus(status) => {
+            Packet::CarStatus(s) => {
                 for i in 0..22
                 {
-                    page.drivers[i as usize].isDRSAllowed = status.carStatus[i as usize].drsAllowed == 1;
-                    page.drivers[i as usize].assistTC     = status.carStatus[i as usize].tractionControl;
-                    page.drivers[i as usize].assistABS    = status.carStatus[i as usize].antiLockBrakes;
-                    page.drivers[i as usize].tyreActual   = status.carStatus[i as usize].actualTyre;
-                    page.drivers[i as usize].tyreVisual   = status.carStatus[i as usize].visualTyre;
-                    page.drivers[i as usize].tyreAge      = status.carStatus[i as usize].tyresAgeLaps;
-                    page.drivers[i as usize].underFlag    = status.carStatus[i as usize].vehicleFiaFlags;
+                    let idx = i as usize;
+
+                    page.cars[idx].DRS.isAllowed             = s.carStatus[idx].drsAllowed == 1;
+                    page.cars[idx].assist.TC                 = s.carStatus[idx].tractionControl;
+                    page.cars[idx].assist.ABS                = s.carStatus[idx].antiLockBrakes;
+                    page.cars[idx].tyres.actual              = s.carStatus[idx].actualTyre;
+                    page.cars[idx].tyres.visual              = s.carStatus[idx].visualTyre;
+                    page.cars[idx].tyres.age                 = s.carStatus[idx].tyresAgeLaps;
+                    page.cars[idx].underFlag                 = s.carStatus[idx].vehicleFiaFlags;
                 }
             }
-            Packet::Lap(lap) => {
+            Packet::Lap(l) => {
                 for i in 0..22
                 {
-                    page.positions[lap.laps[i as usize].carPosition as usize] = i;
+                    let idx = i as usize;
+                    let pos = l.laps[idx].carPosition as usize;
 
-                    page.drivers[i as usize].spotGrid    = lap.laps[i as usize].gridPosition;
-                    page.drivers[i as usize].spotRace    = lap.laps[i as usize].carPosition;
-                    page.drivers[i as usize].lapNum      = lap.laps[i as usize].currentLapNum;
-                    page.drivers[i as usize].pitCount    = lap.laps[i as usize].numPitStops;
-                    page.drivers[i as usize].carStatus   = lap.laps[i as usize].driverStatus;
-                    page.drivers[i as usize].sector      = lap.laps[i as usize].sector;
-                    page.drivers[i as usize].timeSector1 = lap.laps[i as usize].sector1TimeInMS;
-                    page.drivers[i as usize].timeSector2 = lap.laps[i as usize].sector2TimeInMS;
-                    page.drivers[i as usize].timeCurrent = lap.laps[i as usize].currentLapTimeInMS;
-                    page.drivers[i as usize].timeLastLap = lap.laps[i as usize].lastLapTimeInMS;
+                    // Update car positions.
+                    page.positions[pos] = i;
+
+                    // Update Leader Lap
+                    page.lap.leader = {
+                        if l.laps[idx].currentLapNum > page.lap.leader {
+                            l.laps[idx].currentLapNum
+                        } else {
+                            page.lap.leader
+                        }
+                    };
+
+                    // Sector 3 Time
+                    if page.cars[idx].lapNum > l.laps[idx].currentLapNum {
+                        page.cars[idx].time.sector3.TimeInMS = (
+                            page.cars[idx].time.sector2.TimeInMS as u32 -
+                            l.laps[idx].lastLapTimeInMS.TimeInMS
+                        ) as u16
+                    }
+
+                    // Update Best Sectors
+
+
+                    // Now update the remaining new informaiton.
+                    page.cars[idx].spotGrid                 = l.laps[idx].gridPosition;
+                    page.cars[idx].spotRace                 = l.laps[idx].carPosition;
+                    page.cars[idx].lapNum                   = l.laps[idx].currentLapNum;
+                    page.cars[idx].pitCount                 = l.laps[idx].numPitStops;
+                    page.cars[idx].carStatus                = l.laps[idx].driverStatus;
+                    page.cars[idx].sector                   = l.laps[idx].sector;
+                    page.cars[idx].time.sector1             = l.laps[idx].sector1TimeInMS;
+                    page.cars[idx].time.sector2             = l.laps[idx].sector2TimeInMS;
+                    page.cars[idx].time.current             = l.laps[idx].currentLapTimeInMS;
+                    page.cars[idx].time.lastLap             = l.laps[idx].lastLapTimeInMS;
                 }
             }
             _ => {
@@ -247,37 +364,43 @@ fn main() {
         // Clear Screen & Corsor @ Top Left
         print!("{esc}c", esc = 27 as char);
 
-        // Header
         println!(
-            "{spotRace:02} {carNumber:02} {driverName:>20} {timeCurrent:>7} | {timeSector1:>7} {timeSector2:>7} | {timeLastLap:>7} {laps:>4} {tyre:>4} {status}",
-            spotRace    = "##",
-            carNumber   = "##",
-            driverName  = "Driver",
-            timeCurrent = "Time",
-            timeSector1 = "S1",
-            timeSector2 = "S2",
-            timeLastLap = "Last",
-            laps        = "Laps",
-            tyre        = "Tyre",
-            status      = "Status",
+            "Lap: {lapLeader:02} {lapTotal:02}",
+            lapLeader = page.lap.leader,
+            lapTotal  = page.lap.total
         );
 
+        // Header
+            println!(
+                "{spotRace:2} {driver:>24} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} {laps:>4} {tyre:>4} {status}",
+                spotRace    = "P",
+                driver      = "Driver",
+                timeLastLap = "Last",
+                timeSector1 = "S1",
+                timeSector2 = "S2",
+                timeSector3 = "S3",
+                timeCurrent = "Time",
+                laps        = "Laps",
+                tyre        = "Tyre",
+                status      = "Status",
+            );
+
         // Drivers
-        for i in 0..22
+        for i in 1..21
         {
             let p: usize = page.positions[i as usize].into();
             println!(
-                "{spotRace:02} {carNumber:02} {driverName:>20} {timeCurrent:>7} | {timeSector1:>7} {timeSector2:>7} | {timeLastLap:>7} {laps:>4} {tyre:#?} {status:#?}",
-                spotRace    = page.drivers[p].spotRace,
-                carNumber   = page.drivers[p].carNumber,
-                driverName  = page.drivers[p].driverName,
-                timeCurrent = format!("{}", page.drivers[p].timeCurrent),
-                timeSector1 = format!("{}", page.drivers[p].timeSector1),
-                timeSector2 = format!("{}", page.drivers[p].timeSector2),
-                timeLastLap = format!("{}", page.drivers[p].timeLastLap),
-                laps        = page.drivers[p].lapNum,
-                tyre        = page.drivers[p].tyreActual,
-                status      = page.drivers[p].carStatus
+                "{spotRace:02} {driver:>33} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} {laps:>4} {tyre:#?} {status:#?}",
+                spotRace    = page.cars[p].spotRace,
+                driver      = page.cars[p].driver.getDriver(),
+                timeLastLap = format!("{}", page.cars[p].time.lastLap),
+                timeSector1 = format!("{}", page.cars[p].time.sector1),
+                timeSector2 = format!("{}", page.cars[p].time.sector2),
+                timeSector3 = format!("{}", page.cars[p].time.sector3),
+                timeCurrent = format!("{}", page.cars[p].time.current),
+                laps        = page.cars[p].lapNum,
+                tyre        = page.cars[p].tyres.actual,
+                status      = page.cars[p].carStatus
             );
         }
 

@@ -2065,6 +2065,29 @@ impl ActualCompound {
     }
 }
 
+impl fmt::Display for ActualCompound {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self
+        {
+                     C1 => write!(f, "C1"),
+                     C2 => write!(f, "C2"),
+                     C3 => write!(f, "C3"),
+                     C4 => write!(f, "C4"),
+                     C5 => write!(f, "C5"),
+                  F2Wet => write!(f, "W"),
+                 F2Hard => write!(f, "H"),
+               F2Medium => write!(f, "M"),
+                 F2Soft => write!(f, "S"),
+            F2SuperSoft => write!(f, "S"),
+            ClassicWet  => write!(f, "W"),
+            ClassicDry  => write!(f, "D"),
+                   Wet  => write!(f, "W"),
+                 Inter  => write!(f, "I"),
+                      _ => write!(f, ""),
+        }
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum VisualCompound {
