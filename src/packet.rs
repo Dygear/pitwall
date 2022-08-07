@@ -1074,7 +1074,7 @@ pub struct PacketLap
 {
     pub header: Header,                 // 24 Bytes - Header
 
-    pub laps: [Lap; 22],                // Lap data for allpub  cars on track
+    pub laps: [Lap; 22],                // Lap data for all cars on track
 
     pub timeTrialPBCarIdx: u8,          // Index of Personal Best car in time trial (255 if invalid)
     pub timeTrialRivalCarIdx: u8,       // Index of Rival car in time trial (255 if invalid)

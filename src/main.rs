@@ -332,7 +332,7 @@ fn main() {
                 }
             }
             Packet::Lap(l) => {
-                for i in 0..22
+                for i in 1..21
                 {
                     let idx = i as usize;
                     let pos = l.laps[idx].carPosition as usize;
@@ -369,22 +369,27 @@ fn main() {
                     {
                         0 => {
                             // Check Sector 3
-                            println!("CHECK");
                             if l.laps[idx].currentLapNum > 1 && (!page.bests.sector3.isSet || page.bests.sector3.time > page.cars[idx].time.sector3)
                             {
-                                println!("{}", "BEFORE:".red());
-                                println!("{:#?}", page);
                                 page.bests.sector3 = BestSector {
                                     time: page.cars[idx].time.sector3,
                                     byId: i,
                                     onLap: l.laps[idx].currentLapNum,
                                     isSet: true,
                                 };
-                                println!("{}", "AFTER:".red());
-                                println!("{:#?}", page);
-                                println!("{:#?}", l);
+                                // Check best.possible.
+                                update_possible(&mut page.bests);
+                            }
 
-                                return;
+                            // Check best.lapTime.
+                            if !page.bests.lapTime.isSet && l.laps[idx].currentLapNum != 1 || (page.bests.lapTime.time > l.laps[idx].lastLapTimeInMS)
+                            {
+                                page.bests.lapTime = BestLap {
+                                    time: l.laps[idx].lastLapTimeInMS,
+                                    byId: i,
+                                    onLap: l.laps[idx].currentLapNum,
+                                    isSet: true,
+                                };
                             }
                         },
                         1 => {
@@ -396,7 +401,9 @@ fn main() {
                                     byId: i,
                                     onLap: l.laps[idx].currentLapNum,
                                     isSet: true,
-                                }
+                                };
+                                // Check best.possible.
+                                update_possible(&mut page.bests);
                             }
                         },
                         2 => {
@@ -408,7 +415,9 @@ fn main() {
                                     byId: i,
                                     onLap: l.laps[idx].currentLapNum,
                                     isSet: true,
-                                }
+                                };
+                                // Check best.possible.
+                                update_possible(&mut page.bests);
                             }
                         },
                         _ => {}
@@ -443,7 +452,8 @@ fn main() {
 
         // Header
             println!(
-                "{spotRace:2} {driver:>24} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:^3} {tyre:^4} {status:>6} {sector:>6} | {revLights:>15} {gear} {speed}",
+                "{idx:2} {spotRace:2} {driver:>24} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:^3} {tyre:^4} {status:>6} {sector:>6} | {revLights:>15} {gear} {speed}",
+                idx         = "ID",
                 spotRace    = "P",
                 driver      = "Driver",
                 timeLastLap = "Last",
@@ -465,7 +475,8 @@ fn main() {
         {
             let p: usize = page.positions[i as usize].into();
             println!(
-                "{spotRace:02} {driver:>33} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:^3} {tyre:^4}  {status:>6} {sector:>6} | {revLights} {gear:>4} {speed:>3}",
+                "{idx:02} {spotRace:02} {driver:>33} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:^3} {tyre:^4}  {status:>6} {sector:>6} | {revLights} {gear:>4} {speed:>3}",
+                idx         = p,
                 spotRace    = page.cars[p].spotRace,
                 driver      = page.cars[p].driver.getDriver(),
                 timeLastLap = format!("{}", page.cars[p].time.lastLap),
@@ -488,7 +499,8 @@ fn main() {
 
         // Bests
             println!(
-                "{spotRace:2} {driver:>24} {bestLapTime:>7} | {bestSector1:>7} {bestSector2:>7} {bestSector3:>7} | {bestPossible:>7} | {lap:^3} {tyre:^4} {status:>6}",
+                "{idx:2} {spotRace:2} {driver:>24} {bestLapTime:>7} | {bestSector1:>7} {bestSector2:>7} {bestSector3:>7} | {bestPossible:>7} | {lap:^3} {tyre:^4} {status:>6}",
+                idx         = "",
                 spotRace    = "",
                 driver      = "Bests",
                 bestLapTime = format!("{}", page.bests.lapTime),
@@ -518,4 +530,19 @@ fn main() {
         println!("");
 
     }
+}
+
+fn update_possible(best: &mut Bests) -> bool
+{
+    if best.sector1.isSet && best.sector2.isSet && best.sector3.isSet
+    {
+        let newBestPossible: u32 = best.sector1.time.TimeInMS as u32 + best.sector2.time.TimeInMS as u32 + best.sector3.time.TimeInMS as u32;
+
+        if !best.possible.isSet || best.possible.time.TimeInMS > newBestPossible
+        {
+            best.possible.time.TimeInMS = newBestPossible;
+            return true;
+        }
+    }
+    return false;
 }
