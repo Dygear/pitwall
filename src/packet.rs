@@ -2754,10 +2754,10 @@ impl Valid
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LapHistory
 {
-    pub lapTimeInMS: TimeLong,          // Lap time in milliseconds
-    pub sector1TimeInMS: TimeShort,     // Sector 1 time in milliseconds
-    pub sector2TimeInMS: TimeShort,     // Sector 2 time in milliseconds
-    pub sector3TimeInMS: TimeShort,     // Sector 3 time in milliseconds
+    pub lapTimeInMS: TimeLong,          // u32 Lap time in milliseconds
+    pub sector1TimeInMS: TimeShort,     // u16 Sector 1 time in milliseconds
+    pub sector2TimeInMS: TimeShort,     // u16 Sector 2 time in milliseconds
+    pub sector3TimeInMS: TimeShort,     // u16 Sector 3 time in milliseconds
     pub lapValidBitFlags: Valid,        // u8 - 0x01 bit set-lap valid, 0x02 bit set-sector 1 valid 0x04 bit set-sector 2 valid, 0x08 bit set-sector 3 valid
 }
 
@@ -2828,15 +2828,14 @@ impl PacketSessionHistory
             bestSector1LapNum: bytes[28],
             bestSector2LapNum: bytes[29],
             bestSector3LapNum: bytes[30],
-            lapHistory       : Self::lapHistory(&bytes[(size_of::<Header>()+7)..(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)]),
-            tyreStintsHistory: Self::tyreStintHistory(&bytes[(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)..(size_of::<Header>()+7)+(size_of::<LapHistory>()*100)+(size_of::<TyreStintHistory>()*8)]),        }
+            lapHistory       : Self::lapHistory(&bytes[24+7..(24+7)+(11*100)]),
+            tyreStintsHistory: Self::tyreStintHistory(&bytes[(24+7)+(11*100)..(24+7)+(11*100)+(3*8)]),        }
     }
 
     pub fn lapHistory(bytes: &[u8]) -> [LapHistory; 100]
     {
         let mut lh = [LapHistory::default(); 100];
-
-        let size = size_of::<LapHistory>();
+        let size = 11;
 
         for i in 0..100
         {
@@ -2852,8 +2851,7 @@ impl PacketSessionHistory
     pub fn tyreStintHistory(bytes: &[u8]) -> [TyreStintHistory; 8]
     {
         let mut tsh = [TyreStintHistory::default(); 8];
-
-        let size = size_of::<TyreStintHistory>();
+        let size = 3;
 
         for i in 0..8
         {

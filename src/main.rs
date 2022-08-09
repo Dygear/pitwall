@@ -205,6 +205,7 @@ struct Bests {
 struct Page
 {
     participants: u8,                   // PacketParticipants.numActiveCars
+    playerCarIndex: u8,                 // Always the last item, and so gives you the bounds of the array.
     positions: [u8; 22],
     r#type: Session,                    // PacketSession.sessionType
     bests: Bests,
@@ -218,7 +219,7 @@ fn main() {
 
     let mut page = Page::default();
 
-    let mut buffer = [0; 4096];
+    let mut buffer = [0; 1500];
     loop
     {
         let (size, _) = socket.recv_from(&mut buffer).unwrap();
@@ -284,12 +285,14 @@ fn main() {
         match packet
         {
             Packet::Session(session) => {
+                page.playerCarIndex = session.header.playerCarIndex;
                 page.r#type = session.sessionType;
             }
             Packet::Participants(p) => {
+                page.playerCarIndex = p.header.playerCarIndex;
                 page.participants = p.numActiveCars;
 
-                for i in 0..22
+                for i in 0..=page.playerCarIndex
                 {
                     let idx = i as usize;
 
@@ -305,7 +308,9 @@ fn main() {
                 }
             }
             Packet::CarTelemetry(t) => {
-                for i in 0..22
+                page.playerCarIndex = t.header.playerCarIndex;
+
+                for i in 0..=page.playerCarIndex
                 {
                     let idx = i as usize;
 
@@ -318,7 +323,9 @@ fn main() {
 
             }
             Packet::CarStatus(s) => {
-                for i in 0..22
+                page.playerCarIndex = s.header.playerCarIndex;
+
+                for i in 0..=page.playerCarIndex
                 {
                     let idx = i as usize;
 
@@ -332,7 +339,9 @@ fn main() {
                 }
             }
             Packet::Lap(l) => {
-                for i in 1..21
+                page.playerCarIndex = l.header.playerCarIndex;
+
+                for i in 0..=page.playerCarIndex
                 {
                     let idx = i as usize;
                     let pos = l.laps[idx].carPosition as usize;
@@ -471,7 +480,7 @@ fn main() {
             );
 
         // Drivers
-        for i in 1..21
+        for i in 0..=page.playerCarIndex
         {
             let p: usize = page.positions[i as usize].into();
             println!(
