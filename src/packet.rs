@@ -944,30 +944,35 @@ impl fmt::Display for TimeShort
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Lap
 {
-    pub lastLapTimeInMS: TimeLong,          // u32 Last lap time in milliseconds
-    pub currentLapTimeInMS: TimeLong,       // u32 Current time around the lap in milliseconds
-    pub sector1TimeInMS: TimeShort,         // u16 Sector 1 time in milliseconds
-    pub sector2TimeInMS: TimeShort,         // u16 Sector 2 time in milliseconds
-    pub lapDistance: f32,                   // Distance vehicle is around current lap in metres – could be negative if line hasn’t been crossed yet
-    pub totalDistance: f32,                 // Total distance travelled in session in metres – could be negative if line hasn’t been crossed yet
-    pub safetyCarDelta: f32,                // Delta in seconds for safety car
-    pub carPosition: u8,                    // Car race position
-    pub currentLapNum: u8,                  // Current lap number
-    pub pitStatus: PitStatus,               // u8
-    pub numPitStops: u8,                    // Number of pit stops taken in this race
-    pub sector: u8,                         // 0 = sector1, 1 = sector2, 2 = sector3
-    pub currentLapInvalid: u8,              // Current lap invalid - 0 = valid, 1 = invalid
-    pub penalties: u8,                      // Accumulated time penalties in seconds to be added
-    pub warnings: u8,                       // Accumulated number of warnings issued
-    pub numUnservedDriveThroughPens: u8,    // Num drive through pens left to serve
-    pub numUnservedStopGoPens: u8,          // Num stop go pens left to serve
-    pub gridPosition: u8,                   // Grid position the vehicle started the race in
-    pub driverStatus: CarState,             // u8
-    pub resultStatus: ResultStatus,         // u8
-    pub pitLaneTimerActive: u8,             // Pit lane timing, 0 = inactive, 1 = active
-    pub pitLaneTimeInLaneInMS: TimeShort,   // u16 If active, the current time spent in the pit lane in ms
-    pub pitStopTimerInMS: TimeShort,        // u16 Time of the actual pit stop in ms
-    pub pitStopShouldServePen: u8,          // Whether the car should serve a penalty at this stop
+    pub lastLapTimeInMS: TimeLong,        // u32 - Last lap time in milliseconds
+    pub currentLapTimeInMS: TimeLong,     // u32 - Current time around the lap in milliseconds
+    pub sector1TimeInMS: TimeShort,       // u16 - Sector 1 time in milliseconds
+    pub sector2TimeInMS: TimeShort,       // u16 - Sector 2 time in milliseconds
+    pub lapDistance: f32,                 // f32 - Distance vehicle is around current lap in metres – could
+                                          //       be negative if line hasn’t been crossed yet
+    pub totalDistance: f32,               // f32 - Total distance travelled in session in metres – could
+                                          //        be negative if line hasn’t been crossed yet
+    pub safetyCarDelta: f32,              // f32 - Delta in seconds for safety car
+    pub carPosition: u8,                  // u8  - Car race position
+    pub currentLapNum: u8,                // u8  - Current lap number
+    pub pitStatus: PitStatus,             // u8  - 0 = none, 1 = pitting, 2 = in pit area
+    pub numPitStops: u8,                  // u8  - Number of pit stops taken in this race
+    pub sector: u8,                       // u8  - 0 = sector1, 1 = sector2, 2 = sector3
+    pub currentLapInvalid: u8,            // u8  - Current lap invalid - 0 = valid, 1 = invalid
+    pub penalties: u8,                    // u8  - Accumulated time penalties in seconds to be added
+    pub warnings: u8,                     // u8  - Accumulated number of warnings issued
+    pub numUnservedDriveThroughPens: u8,  // u8  - Num drive through pens left to serve
+    pub numUnservedStopGoPens: u8,        // u8  - Num stop go pens left to serve
+    pub gridPosition: u8,                 // u8  - Grid position the vehicle started the race in
+    pub driverStatus: CarState,           // u8  - Status of driver - 0 = in garage, 1 = flying lap
+                                          //        2 = in lap, 3 = out lap, 4 = on track
+    pub resultStatus: ResultStatus,       // u8  - Result status - 0 = invalid, 1 = inactive, 2 = active
+                                          //        3 = finished, 4 = didnotfinish, 5 = disqualified
+                                          //        6 = not classified, 7 = retired
+    pub pitLaneTimerActive: u8,           // u8  - Pit lane timing, 0 = inactive, 1 = active
+    pub pitLaneTimeInLaneInMS: TimeShort, // u16 - If active, the current time spent in the pit lane in ms
+    pub pitStopTimerInMS: TimeShort,      // u16 - Time of the actual pit stop in ms
+    pub pitStopShouldServePen: u8,        // u8  - Whether the car should serve a penalty at this stop
 }
 
 impl Lap

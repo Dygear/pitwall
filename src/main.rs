@@ -284,12 +284,12 @@ fn main() {
 
         match packet
         {
-            Packet::Session(session) => {
-                page.playerCarIndex = session.header.playerCarIndex;
-                page.r#type = session.sessionType;
+            Packet::Session(s) => {
+                page.playerCarIndex = s.header.playerCarIndex;
+                page.lap.total = s.totalLaps;
+                page.r#type = s.sessionType;
             }
             Packet::Participants(p) => {
-                page.playerCarIndex = p.header.playerCarIndex;
                 page.participants = p.numActiveCars;
 
                 for i in 0..=page.playerCarIndex
@@ -308,8 +308,6 @@ fn main() {
                 }
             }
             Packet::CarTelemetry(t) => {
-                page.playerCarIndex = t.header.playerCarIndex;
-
                 for i in 0..=page.playerCarIndex
                 {
                     let idx = i as usize;
@@ -323,8 +321,6 @@ fn main() {
 
             }
             Packet::CarStatus(s) => {
-                page.playerCarIndex = s.header.playerCarIndex;
-
                 for i in 0..=page.playerCarIndex
                 {
                     let idx = i as usize;
@@ -339,8 +335,6 @@ fn main() {
                 }
             }
             Packet::Lap(l) => {
-                page.playerCarIndex = l.header.playerCarIndex;
-
                 for i in 0..=page.playerCarIndex
                 {
                     let idx = i as usize;
@@ -506,27 +500,28 @@ fn main() {
                 sector      = "Sector"
             );
 
-        // Drivers
-        for i in 0..=page.playerCarIndex
+        // Cars
+        // Need to figure out how to "zip" this together with:
+        // let p: usize = page.positions[i as usize].into();
+        // So that they are ordered correctly.
+        for (idx, car) in page.cars.iter().enumerate()
         {
-            let p: usize = page.positions[i as usize].into();
             println!(
                 "{idx:02} {spotRace:02} {driver:>33} {timeLastLap:>16} | {timeSector1:>16} {timeSector2:>16} {timeSector3:>16} | {timeCurrent:>16} | {lap:^3} {tyre:^4}  {status:>6} {sector:>6} | {revLights} {gear:>4} {speed:>3}",
-                idx         = p,
-                spotRace    = page.cars[p].spotRace,
-                driver      = page.cars[p].driver.getDriver(),
-                timeLastLap = format!("{}", page.cars[p].time.lastLap),
-                timeSector1 = format!("{}", page.cars[p].time.sector1),
-                timeSector2 = format!("{}", page.cars[p].time.sector2),
-                timeSector3 = format!("{}", page.cars[p].time.sector3),
-                timeCurrent = format!("{}", page.cars[p].time.current),
-                lap         = page.cars[p].lapNum,
-                tyre        = format!("{}", page.cars[p].tyres),
-                status      = format!("{}", page.cars[p].carStatus),
-                revLights   = page.cars[p].telemetry.leds,
-                gear        = format!("{}", page.cars[p].telemetry.gear),
-                speed       = format!("{}", page.cars[p].telemetry.speed),
-                sector      = page.cars[p].sector
+                spotRace    = car.spotRace,
+                driver      = car.driver.getDriver(),
+                timeLastLap = format!("{}", car.time.lastLap),
+                timeSector1 = format!("{}", car.time.sector1),
+                timeSector2 = format!("{}", car.time.sector2),
+                timeSector3 = format!("{}", car.time.sector3),
+                timeCurrent = format!("{}", car.time.current),
+                lap         = car.lapNum,
+                tyre        = format!("{}", car.tyres),
+                status      = format!("{}", car.carStatus),
+                revLights   = car.telemetry.leds,
+                gear        = format!("{}", car.telemetry.gear),
+                speed       = format!("{}", car.telemetry.speed),
+                sector      = car.sector
             );
         }
 
@@ -544,7 +539,7 @@ fn main() {
                 bestSector2 = format!("{}", page.bests.sector2),
                 bestSector3 = format!("{}", page.bests.sector3),
                 bestPossible= format!("{}", page.bests.possible),
-                lap        = "",
+                lap         = "",
                 tyre        = "",
                 status      = "",
             );
