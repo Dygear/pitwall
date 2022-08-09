@@ -5,6 +5,17 @@ use std::cmp::Ordering;
 use std::mem::size_of;
 use std::fmt;
 
+static ESC: char      = 27 as char;
+static RESET: &str    = "[0m";
+static _BLACK: &str   = "[30m";
+static RED: &str      = "[31m";
+static GREEN: &str    = "[32m";
+static YELLOW: &str   = "[33m";
+static BLUE: &str     = "[34m";
+static MAGENTA: &str  = "[35m";
+static _CYAN: &str    = "[36m";
+static WHITE: &str    = "[37m";
+
 // https://answers.ea.com/t5/General-Discussion/F1-22-UDP-Specification/td-p/11551274
 
 /**
@@ -854,7 +865,18 @@ impl PartialEq for TimeLong
 impl fmt::Display for TimeLong
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.3}", self.TimeInMS as f32 / 1000 as f32)
+        if self.isOB
+        {
+            write!(f, "{ESC}{MAGENTA}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
+        }
+        else if self.isPB
+        {
+            write!(f, "{ESC}{GREEN}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
+        }
+        else
+        {
+            write!(f, "{ESC}{YELLOW}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
+        }
     }
 }
 
@@ -903,7 +925,18 @@ impl PartialEq for TimeShort
 impl fmt::Display for TimeShort
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.3}", self.TimeInMS as f32 / 1000 as f32)
+        if self.isOB
+        {
+            write!(f, "{ESC}{MAGENTA}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
+        }
+        else if self.isPB
+        {
+            write!(f, "{ESC}{GREEN}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
+        }
+        else
+        {
+            write!(f, "{ESC}{YELLOW}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
+        }
     }
 }
 
@@ -2829,7 +2862,8 @@ impl PacketSessionHistory
             bestSector2LapNum: bytes[29],
             bestSector3LapNum: bytes[30],
             lapHistory       : Self::lapHistory(&bytes[24+7..(24+7)+(11*100)]),
-            tyreStintsHistory: Self::tyreStintHistory(&bytes[(24+7)+(11*100)..(24+7)+(11*100)+(3*8)]),        }
+            tyreStintsHistory: Self::tyreStintHistory(&bytes[(24+7)+(11*100)..(24+7)+(11*100)+(3*8)]),
+        }
     }
 
     pub fn lapHistory(bytes: &[u8]) -> [LapHistory; 100]

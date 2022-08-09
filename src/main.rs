@@ -4,6 +4,17 @@ use std::net::UdpSocket;
 use colored::*;
 use std::fmt;
 
+static ESC: char      = 27 as char;
+static RESET: &str    = "[0m";
+static _BLACK: &str   = "[30m";
+static RED: &str      = "[31m";
+static GREEN: &str    = "[32m";
+static YELLOW: &str   = "[33m";
+static BLUE: &str     = "[34m";
+static MAGENTA: &str  = "[35m";
+static _CYAN: &str    = "[36m";
+static WHITE: &str    = "[37m";
+
 mod packet;
 use packet::*;
 
@@ -90,25 +101,14 @@ impl fmt::Display for Tyres
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
-        let esc = 27 as char;
-        let reset    = "[0m";
-        let _black   = "[30m";
-        let red      = "[31m";
-        let green    = "[32m";
-        let yellow   = "[33m";
-        let blue     = "[34m";
-        let magenta  = "[35m";
-        let _cyan    = "[36m";
-        let white    = "[37m";
-
         match self.visual
         {
-            VisualCompound::OldHard     | VisualCompound::Hard   => write!(f, "{esc}{color}({esc}{reset}{}{esc}{color}){esc}{reset}", self.visual, color = white  ),
-            VisualCompound::OldMedium   | VisualCompound::Medium => write!(f, "{esc}{color}({esc}{reset}{}{esc}{color}){esc}{reset}", self.visual, color = yellow ),
-            VisualCompound::OldSoft     | VisualCompound::Soft   => write!(f, "{esc}{color}({esc}{reset}{}{esc}{color}){esc}{reset}", self.visual, color = red    ),
-            VisualCompound::OldSuperSoft                         => write!(f, "{esc}{color}({esc}{reset}{}{esc}{color}){esc}{reset}", self.visual, color = magenta),
-            VisualCompound::Inter                                => write!(f, "{esc}{color}({esc}{reset}{}{esc}{color}){esc}{reset}", self.visual, color = green  ),
-            VisualCompound::OldWet      | VisualCompound::Wet    => write!(f, "{esc}{color}({esc}{reset}{}{esc}{color}){esc}{reset}", self.visual, color = blue   ),
+            VisualCompound::OldHard     | VisualCompound::Hard   => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = WHITE  ),
+            VisualCompound::OldMedium   | VisualCompound::Medium => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = YELLOW ),
+            VisualCompound::OldSoft     | VisualCompound::Soft   => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = RED    ),
+            VisualCompound::OldSuperSoft                         => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = MAGENTA),
+            VisualCompound::Inter                                => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = GREEN  ),
+            VisualCompound::OldWet      | VisualCompound::Wet    => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = BLUE   ),
                                                                _ => write!(f, "{}", self.actual)
         }
     }
@@ -386,6 +386,13 @@ fn main() {
                                     onLap: l.laps[idx].currentLapNum,
                                     isSet: true,
                                 };
+
+                                page.cars[idx].time.sector3 = TimeShort {
+                                    TimeInMS: page.cars[idx].time.sector3.TimeInMS,
+                                    isPB: true,
+                                    isOB: true,
+                                };
+
                                 // Check best.possible.
                                 update_possible(&mut page.bests);
                             }
@@ -399,6 +406,12 @@ fn main() {
                                     onLap: l.laps[idx].currentLapNum,
                                     isSet: true,
                                 };
+
+                                page.cars[idx].time.lastLap = TimeLong {
+                                    TimeInMS: page.cars[idx].time.lastLap.TimeInMS,
+                                    isPB: true,
+                                    isOB: true,
+                                };
                             }
                         },
                         1 => {
@@ -411,6 +424,13 @@ fn main() {
                                     onLap: l.laps[idx].currentLapNum,
                                     isSet: true,
                                 };
+
+                                page.cars[idx].time.sector1 = TimeShort {
+                                    TimeInMS: page.cars[idx].time.sector1.TimeInMS,
+                                    isPB: true,
+                                    isOB: true,
+                                };
+
                                 // Check best.possible.
                                 update_possible(&mut page.bests);
                             }
@@ -425,6 +445,13 @@ fn main() {
                                     onLap: l.laps[idx].currentLapNum,
                                     isSet: true,
                                 };
+
+                                page.cars[idx].time.sector2 = TimeShort {
+                                    TimeInMS: page.cars[idx].time.sector2.TimeInMS,
+                                    isPB: true,
+                                    isOB: true,
+                                };
+
                                 // Check best.possible.
                                 update_possible(&mut page.bests);
                             }
@@ -451,7 +478,7 @@ fn main() {
         }
 
         // Clear Screen & Corsor @ Top Left
-        print!("{esc}c", esc = 27 as char);
+        print!("{ESC}c");
 
         println!(
             "Lap: {lapLeader:02} {lapTotal:02}",
@@ -484,7 +511,7 @@ fn main() {
         {
             let p: usize = page.positions[i as usize].into();
             println!(
-                "{idx:02} {spotRace:02} {driver:>33} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:^3} {tyre:^4}  {status:>6} {sector:>6} | {revLights} {gear:>4} {speed:>3}",
+                "{idx:02} {spotRace:02} {driver:>33} {timeLastLap:>16} | {timeSector1:>16} {timeSector2:>16} {timeSector3:>16} | {timeCurrent:>16} | {lap:^3} {tyre:^4}  {status:>6} {sector:>6} | {revLights} {gear:>4} {speed:>3}",
                 idx         = p,
                 spotRace    = page.cars[p].spotRace,
                 driver      = page.cars[p].driver.getDriver(),
