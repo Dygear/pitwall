@@ -206,7 +206,7 @@ struct Page
 {
     participants: u8,                   // PacketParticipants.numActiveCars
     playerCarIndex: u8,                 // Always the last item, and so gives you the bounds of the array.
-    positions: [u8; 22],
+    positions: [usize; 22],
     r#type: Session,                    // PacketSession.sessionType
     bests: Bests,
     cars: [Car; 22],
@@ -346,7 +346,7 @@ fn main() {
                     }
 
                     // Update car positions.
-                    page.positions[pos] = i;
+                    page.positions[pos] = idx;
 
                     // Update Leader Lap
                     page.lap.leader = {
@@ -487,9 +487,9 @@ fn main() {
 
         // Header
             println!(
-                "{idx:2} {spotRace:2} {driver:>24} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:^3} {tyre:^4} {status:>6} {sector:>6} | {revLights:>15} {gear} {speed}",
+                "{idx:2} {pos:2} {driver:>24} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:^3} {tyre:^4} {status:>6} {sector:>6} | {revLights:>15} {gear} {speed}",
                 idx         = "ID",
-                spotRace    = "P",
+                pos         = "P",
                 driver      = "Driver",
                 timeLastLap = "Last",
                 timeSector1 = "S1",
@@ -509,16 +509,17 @@ fn main() {
         // Need to figure out how to "zip" this together with:
         // let p: usize = page.positions[i as usize].into();
         // So that they are ordered correctly.
-        for (idx, car) in page.cars.iter().enumerate()
+        for (pos, idx) in page.positions.iter().enumerate()
         {
-            if car.spotRace == 0
+            if pos == 0
             {   // Skip empty slots.
                 continue
             }
 
+            let car = &page.cars[*idx];
+
             println!(
-                "{idx:02} {spotRace:02} {driver:>33} {timeLastLap:>16} | {timeSector1:>16} {timeSector2:>16} {timeSector3:>16} | {timeCurrent:>16} | {lap:^3} {tyre:^4}  {status:>6} {sector:>6} | {revLights} {gear:>4} {speed:>3}",
-                spotRace    = car.spotRace,
+                "{idx:02} {pos:02} {driver:>33} {timeLastLap:>16} | {timeSector1:>16} {timeSector2:>16} {timeSector3:>16} | {timeCurrent:>16} | {lap:^3} {tyre:^4}  {status:>6} {sector:>6} | {revLights} {gear:>4} {speed:>3}",
                 driver      = car.driver.getDriver(),
                 timeLastLap = format!("{}", car.time.lastLap),
                 timeSector1 = format!("{}", car.time.sector1),
@@ -540,9 +541,9 @@ fn main() {
 
         // Bests
             println!(
-                "{idx:2} {spotRace:2} {driver:>24} {bestLapTime:>7} | {bestSector1:>7} {bestSector2:>7} {bestSector3:>7} | {bestPossible:>7} | {lap:^3} {tyre:^4} {status:>6}",
+                "{idx:2} {pos:2} {driver:>24} {bestLapTime:>7} | {bestSector1:>7} {bestSector2:>7} {bestSector3:>7} | {bestPossible:>7} | {lap:^3} {tyre:^4} {status:>6}",
                 idx         = "",
-                spotRace    = "",
+                pos         = "",
                 driver      = "Bests",
                 bestLapTime = format!("{}", page.bests.lapTime),
                 bestSector1 = format!("{}", page.bests.sector1),
