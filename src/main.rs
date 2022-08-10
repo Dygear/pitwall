@@ -340,6 +340,11 @@ fn main() {
                     let idx = i as usize;
                     let pos = l.laps[idx].carPosition as usize;
 
+                    if pos == 0
+                    {   // Skip empty slots.
+                        continue
+                    }
+
                     // Update car positions.
                     page.positions[pos] = i;
 
@@ -506,6 +511,11 @@ fn main() {
         // So that they are ordered correctly.
         for (idx, car) in page.cars.iter().enumerate()
         {
+            if car.spotRace == 0
+            {   // Skip empty slots.
+                continue
+            }
+
             println!(
                 "{idx:02} {spotRace:02} {driver:>33} {timeLastLap:>16} | {timeSector1:>16} {timeSector2:>16} {timeSector3:>16} | {timeCurrent:>16} | {lap:^3} {tyre:^4}  {status:>6} {sector:>6} | {revLights} {gear:>4} {speed:>3}",
                 spotRace    = car.spotRace,
