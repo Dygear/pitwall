@@ -1164,18 +1164,46 @@ impl PacketLap
 #[derive(Clone, Copy)]
 pub union EventDetails
 {
+    pub sessionStarted: SessionStarted,
+    pub sessionEnded: SessionEnded,
     pub fastestLap: FastestLap,
     pub retirement: Retirement,
+    pub drsEnabled: DRSEnabled,
+    pub drsDisabled: DRSDisabled,
     pub teamMateInPits: TeamMateInPits,
+    pub chequeredFlag: ChequeredFlag,
     pub raceWinner: RaceWinner,
     pub penalty: Penalty,
     pub speedTrap: SpeedTrap,
     pub startLights: StartLights,
+    pub lightsOut: LightsOut,
     pub driveThroughPenaltyServed: DriveThroughPenaltyServed,
     pub stopGoPenaltyServed: StopGoPenaltyServed,
     pub flashback: Flashback,
     pub buttons: Buttons,
     pub unknownTag: [u8; 4]
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct SessionStarted {}
+impl SessionStarted
+{
+    pub fn unpack() -> Self
+    {
+        Self {}
+    }
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct SessionEnded {}
+impl SessionEnded
+{
+    pub fn unpack() -> Self
+    {
+        Self {}
+    }
 }
 
 #[repr(C, packed)]
@@ -1214,6 +1242,29 @@ impl Retirement
     }
 }
 
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct DRSEnabled {}
+impl DRSEnabled
+{
+    pub fn unpack() -> Self
+    {
+        Self {}
+    }
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct DRSDisabled {}
+impl DRSDisabled
+{
+    pub fn unpack() -> Self
+    {
+        Self {}
+    }
+}
+
 #[repr(C, packed)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TeamMateInPits
@@ -1228,6 +1279,17 @@ impl TeamMateInPits
         Self {
             vehicleIdx: bytes[0],
         }
+    }
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct ChequeredFlag {}
+impl ChequeredFlag
+{
+    pub fn unpack() -> Self
+    {
+        Self {}
     }
 }
 
@@ -1318,6 +1380,17 @@ impl StartLights
         Self {
             numLights: bytes[0],
         }
+    }
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct LightsOut {}
+impl LightsOut
+{
+    pub fn unpack() -> Self
+    {
+        Self {}
     }
 }
 
@@ -1467,8 +1540,14 @@ impl PacketEvent
 
             eventStringCode: eventTag,
             eventDetails: match &eventTag.tag {
-//                b"SSTA" => SessionStarted::unpack(&bytes[28..]),            // Sent when the session starts
-//                b"SEND" => SessionEnded::unpack(&bytes[28..]),              // Sent when the session ends
+                b"SSTA" => EventDetails {
+                        // Sent when the session starts
+                        sessionStarted: SessionStarted::unpack(),
+                    },
+                b"SEND" => EventDetails {
+                        // Sent when the session ends
+                        sessionEnded: SessionEnded::unpack(),
+                    },
                 b"FTLP" => EventDetails {
                         // When a driver achieves the fastest lap
                         fastestLap: FastestLap::unpack(&bytes[28..])
@@ -1477,13 +1556,22 @@ impl PacketEvent
                         // When a driver retires
                         retirement: Retirement::unpack(&bytes[28..])
                     },
-//                b"DRSE" => DRSenabled::unpack(&bytes[28..]),                // Race control have enabled DRS
-//                b"DRSD" => DRSdisabled::unpack(&bytes[28..]),               // Race control have disabled DRS
+                b"DRSE" => EventDetails {
+                        // Race control have enabled DRS
+                        drsEnabled: DRSEnabled::unpack(),
+                    },
+                b"DRSD" => EventDetails {
+                        // Race control have disabled DRS
+                        drsDisabled: DRSDisabled::unpack(),
+                    },
                 b"TMPT" => EventDetails {
                         // Your team mate has entered the pits
                         teamMateInPits: TeamMateInPits::unpack(&bytes[28..])
                     },
-//                b"CHQF" => ChequeredFlag::unpack(&bytes[28..]),             // The chequered flag has been waved
+                b"CHQF" => EventDetails {
+                        // The chequered flag has been waved
+                        chequeredFlag: ChequeredFlag::unpack(),
+                    },
                 b"RCWN" => EventDetails {
                         // The race winner is announced
                         raceWinner: RaceWinner::unpack(&bytes[28..])
@@ -1500,7 +1588,10 @@ impl PacketEvent
                         // Start lights – number shown
                         startLights: StartLights::unpack(&bytes[28..])
                     },
-//                b"LGOT" => LightsOut::unpack(&bytes[28..]),                 // Lights out
+                b"LGOT" => EventDetails {
+                        // Lights out
+                        lightsOut: LightsOut::unpack(),
+                    },
                 b"DTSV" => EventDetails {
                         // Drive through penalty served
                         driveThroughPenaltyServed: DriveThroughPenaltyServed::unpack(&bytes[28..])
