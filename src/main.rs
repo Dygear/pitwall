@@ -153,7 +153,6 @@ struct Car
     pub pitCount: u8,                   // numPitStops
     pub carStatus: CarState,            // driverStatus
     pub sector: u8,                     // sector
-
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -208,7 +207,8 @@ struct Page
     playerCarIndex: u8,                 // Always the last item, and so gives you the bounds of the array.
     positions: [usize; 22],
     r#type: Session,                    // PacketSession.sessionType
-    bests: Bests,
+    ob: Bests,
+    pb: [Bests; 22],
     cars: [Car; 22],
     lap: Lap,
 }
@@ -218,6 +218,7 @@ fn main() {
     println!("UDP Port Bound");
 
     let mut page = Page::default();
+    page.positions = [usize::MAX; 22];
 
     let mut buffer = [0; 1500];
     loop
@@ -338,137 +339,158 @@ fn main() {
                 for i in 0..=page.playerCarIndex
                 {
                     let idx = i as usize;
-                    let pos = l.laps[idx].carPosition as usize;
+                    let lap = &l.laps[idx];
+                    let car = &mut page.cars[idx];
+                    let pos = lap.carPosition as usize;
 
+                    // Skip empty slots.
                     if pos == 0
-                    {   // Skip empty slots.
-                        continue
+                    {
+                        continue;
                     }
+
+                    // Update Leader Lap
+                    if lap.currentLapNum > page.lap.leader
+                    {
+                        page.lap.leader = lap.currentLapNum;
+                    }
+
+                    // Current Lap Time
+                    car.time.current.TimeInMS = lap.currentLapTimeInMS.TimeInMS;
+
+                    // Last Lap Time
+                    car.time.lastLap.TimeInMS = lap.lastLapTimeInMS.TimeInMS;
 
                     // Update car positions.
                     page.positions[pos] = idx;
 
-                    // Update Leader Lap
-                    page.lap.leader = {
-                        if l.laps[idx].currentLapNum > page.lap.leader {
-                            l.laps[idx].currentLapNum
-                        } else {
-                            page.lap.leader
-                        }
-                    };
-
-                    // Sector 3 Time
-                    if l.laps[idx].currentLapNum > page.cars[idx].lapNum
-                    {
-                        page.cars[idx].time.sector3 = TimeShort {
-                            TimeInMS: (
-                                    l.laps[idx].lastLapTimeInMS.TimeInMS - (
-                                        page.cars[idx].time.sector1.TimeInMS as u32 +
-                                        page.cars[idx].time.sector2.TimeInMS as u32
-                                    )
-                                ) as u16,
-                            isPB: false,
-                            isOB: false,
-                        };
-                    }
-
-                    // Update Best Sectors
-                    match l.laps[idx].sector
+                    match lap.sector
                     {
                         0 => {
-                            // Check Sector 3
-                            if l.laps[idx].currentLapNum > 1 && (!page.bests.sector3.isSet || page.bests.sector3.time > page.cars[idx].time.sector3)
+                            // Sector 1 Real Time
+                            car.time.sector1.TimeInMS =  lap.currentLapTimeInMS.TimeInMS as u16;
+
+                            // As this is sector 1, we need to find out of this is the first lap as well.
+                            // If so, we skip it, as there is not enough information for a sector time yet.
+                            if lap.currentLapNum == 1
                             {
-                                page.bests.sector3 = BestSector {
-                                    time: page.cars[idx].time.sector3,
-                                    byId: i,
-                                    onLap: l.laps[idx].currentLapNum,
-                                    isSet: true,
-                                };
-
-                                page.cars[idx].time.sector3 = TimeShort {
-                                    TimeInMS: page.cars[idx].time.sector3.TimeInMS,
-                                    isPB: true,
-                                    isOB: true,
-                                };
-
-                                // Check best.possible.
-                                update_possible(&mut page.bests);
+                                continue;
                             }
 
-                            // Check best.lapTime.
-                            if !page.bests.lapTime.isSet && l.laps[idx].currentLapNum != 1 || (page.bests.lapTime.time > l.laps[idx].lastLapTimeInMS)
+                            // If this isn't our first packet in this lap, we don't need to check best lap / sector 3 times.
+                            if lap.currentLapNum == car.lapNum
                             {
-                                page.bests.lapTime = BestLap {
-                                    time: l.laps[idx].lastLapTimeInMS,
-                                    byId: i,
-                                    onLap: l.laps[idx].currentLapNum,
-                                    isSet: true,
-                                };
+                                continue;
+                            }
 
-                                page.cars[idx].time.lastLap = TimeLong {
-                                    TimeInMS: page.cars[idx].time.lastLap.TimeInMS,
-                                    isPB: true,
-                                    isOB: true,
-                                };
+                            // Last Lap
+                            // Best Overall
+                            if !page.ob.lapTime.isSet || page.ob.lapTime.time > car.time.lastLap
+                            {
+                                car.time.lastLap.isOB = true;
+                                page.ob.lapTime.time = car.time.lastLap;
+                                page.ob.lapTime.isSet = true;
+                            } else {
+                                car.time.lastLap.isOB = false;
+                            }
+
+                            // Sector 3
+                            // Best Overall
+                            if !page.ob.sector3.isSet || page.ob.sector3.time > car.time.sector3
+                            {
+                                car.time.sector3.isOB = true;
+                                page.ob.sector3.time = car.time.sector3;
+                                page.ob.sector3.isSet = true;
+                            } else {
+                                car.time.sector3.isOB = false;
+                            }
+
+                            // Personal Best
+                            if !page.pb[idx].sector3.isSet || page.pb[idx].sector3.time > car.time.sector3
+                            {
+                                car.time.sector3.isPB = true;
+                                page.pb[idx].sector3.time = car.time.sector3;
+                                page.pb[idx].sector3.isSet = true;
+                            } else {
+                                car.time.sector3.isPB = false;
                             }
                         },
                         1 => {
-                            // Check Sector 1 Time
-                            if !page.bests.sector1.isSet || page.bests.sector1.time > l.laps[idx].sector1TimeInMS
+                            // Sector 2 Real Time
+                            car.time.sector2.TimeInMS = (lap.currentLapTimeInMS.TimeInMS -  car.time.sector1.TimeInMS as u32) as u16;
+
+                            // Only process this the first time around.
+                            if car.time.sector1.TimeInMS != 0
                             {
-                                page.bests.sector1 = BestSector {
-                                    time: l.laps[idx].sector1TimeInMS,
-                                    byId: i,
-                                    onLap: l.laps[idx].currentLapNum,
-                                    isSet: true,
-                                };
-
-                                page.cars[idx].time.sector1 = TimeShort {
-                                    TimeInMS: page.cars[idx].time.sector1.TimeInMS,
-                                    isPB: true,
-                                    isOB: true,
-                                };
-
-                                // Check best.possible.
-                                update_possible(&mut page.bests);
+                                continue;
                             }
+
+                            // Best Overall
+                            if !page.ob.sector1.isSet || page.ob.sector1.time > car.time.sector1
+                            {
+                                car.time.sector1.isOB = true;
+                                page.ob.sector1.time = car.time.sector1;
+                                page.ob.sector1.isSet = true;
+                            } else {
+                                car.time.sector1.isOB = false;
+                            }
+
+                            // Personal Best
+                            if !page.pb[idx].sector1.isSet || page.pb[idx].sector1.time > car.time.sector1
+                            {
+                                car.time.sector1.isPB = true;
+                                page.pb[idx].sector1.time = car.time.sector1;
+                                page.pb[idx].sector1.isSet = true;
+                            } else {
+                                car.time.sector1.isPB = false;
+                            }
+
+                            // Update our last known car state.
+                            car.time.sector1 = lap.sector1TimeInMS;
                         },
                         2 => {
-                            // Check Sector 2 Time
-                            if !page.bests.sector2.isSet || page.bests.sector2.time > l.laps[idx].sector2TimeInMS
+                            // Sector 3 Real Time
+                            car.time.sector3.TimeInMS = (lap.currentLapTimeInMS.TimeInMS - (car.time.sector1.TimeInMS as u32 + car.time.sector2.TimeInMS as u32) as u32) as u16;
+
+                            // Only process this the first time around.
+                            if car.time.sector2.TimeInMS != 0
                             {
-                                page.bests.sector2 = BestSector {
-                                    time: l.laps[idx].sector2TimeInMS,
-                                    byId: i,
-                                    onLap: l.laps[idx].currentLapNum,
-                                    isSet: true,
-                                };
-
-                                page.cars[idx].time.sector2 = TimeShort {
-                                    TimeInMS: page.cars[idx].time.sector2.TimeInMS,
-                                    isPB: true,
-                                    isOB: true,
-                                };
-
-                                // Check best.possible.
-                                update_possible(&mut page.bests);
+                                continue;
                             }
+
+                            // Best Overall
+                            if !page.ob.sector2.isSet || page.ob.sector2.time > car.time.sector2
+                            {
+                                car.time.sector2.isOB = true;
+                                page.ob.sector2.time = car.time.sector2;
+                                page.ob.sector2.isSet = true;
+                            } else {
+                                car.time.sector2.isOB = false;
+                            }
+
+                            // Personal Best
+                            if !page.pb[idx].sector2.isSet || page.pb[idx].sector2.time > car.time.sector2
+                            {
+                                car.time.sector2.isPB = true;
+                                page.pb[idx].sector2.time = car.time.sector2;
+                                page.pb[idx].sector2.isSet = true;
+                            } else {
+                                car.time.sector2.isPB = false;
+                            }
+
+                            // Update our last known car state.
+                            car.time.sector2 = lap.sector2TimeInMS;
                         },
-                        _ => {}
+                        _ => unreachable!()
                     }
 
                     // Now update the remaining new informaiton.
-                    page.cars[idx].spotGrid                 = l.laps[idx].gridPosition;
-                    page.cars[idx].spotRace                 = l.laps[idx].carPosition;
-                    page.cars[idx].lapNum                   = l.laps[idx].currentLapNum;
-                    page.cars[idx].pitCount                 = l.laps[idx].numPitStops;
-                    page.cars[idx].carStatus                = l.laps[idx].driverStatus;
-                    page.cars[idx].sector                   = l.laps[idx].sector;
-                    page.cars[idx].time.sector1             = l.laps[idx].sector1TimeInMS;
-                    page.cars[idx].time.sector2             = l.laps[idx].sector2TimeInMS;
-                    page.cars[idx].time.current             = l.laps[idx].currentLapTimeInMS;
-                    page.cars[idx].time.lastLap             = l.laps[idx].lastLapTimeInMS;
+                    car.spotGrid    = lap.gridPosition;
+                    car.spotRace    = lap.carPosition;
+                    car.lapNum      = lap.currentLapNum;
+                    car.pitCount    = lap.numPitStops;
+                    car.carStatus   = lap.driverStatus;
+                    car.sector      = lap.sector;
                 }
             }
             _ => {
@@ -511,7 +533,7 @@ fn main() {
         // So that they are ordered correctly.
         for (pos, idx) in page.positions.iter().enumerate()
         {
-            if pos == 0
+            if pos == 0 || *idx > 22
             {   // Skip empty slots.
                 continue
             }
@@ -545,27 +567,27 @@ fn main() {
                 idx         = "",
                 pos         = "",
                 driver      = "Bests",
-                bestLapTime = format!("{}", page.bests.lapTime),
-                bestSector1 = format!("{}", page.bests.sector1),
-                bestSector2 = format!("{}", page.bests.sector2),
-                bestSector3 = format!("{}", page.bests.sector3),
-                bestPossible= format!("{}", page.bests.possible),
+                bestLapTime = format!("{}", page.ob.lapTime),
+                bestSector1 = format!("{}", page.ob.sector1),
+                bestSector2 = format!("{}", page.ob.sector2),
+                bestSector3 = format!("{}", page.ob.sector3),
+                bestPossible= format!("{}", page.ob.possible),
                 lap         = "",
                 tyre        = "",
                 status      = "",
             );
 
         println!("Bests: {{");
-        let time =  page.bests.sector1.time.TimeInMS as f32 / 1000 as f32;
-        println!("  sector1: {{time: TimeShort: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.bests.sector1.time.isPB,  page.bests.sector1.time.isOB,  page.bests.sector1.byId,  page.bests.sector1.onLap,  page.bests.sector1.isSet);
-        let time =  page.bests.sector2.time.TimeInMS as f32 / 1000 as f32;
-        println!("  sector2: {{time: TimeShort: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.bests.sector2.time.isPB,  page.bests.sector2.time.isOB,  page.bests.sector2.byId,  page.bests.sector2.onLap,  page.bests.sector2.isSet);
-        let time =  page.bests.sector3.time.TimeInMS as f32 / 1000 as f32;
-        println!("  sector3: {{time: TimeShort: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.bests.sector3.time.isPB,  page.bests.sector3.time.isOB,  page.bests.sector3.byId,  page.bests.sector3.onLap,  page.bests.sector3.isSet);
-        let time =  page.bests.lapTime.time.TimeInMS as f32 / 1000 as f32;
-        println!("  lapTime: {{time:  TimeLong: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.bests.lapTime.time.isPB,  page.bests.lapTime.time.isOB,  page.bests.lapTime.byId,  page.bests.lapTime.onLap,  page.bests.lapTime.isSet);
-        let time = page.bests.possible.time.TimeInMS as f32 / 1000 as f32;
-        println!(" possible: {{time:  TimeLong: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",  page.bests.possible.time.isPB, page.bests.possible.time.isOB, page.bests.possible.byId, page.bests.possible.onLap, page.bests.possible.isSet);
+        let time =  page.ob.sector1.time.TimeInMS as f32 / 1000 as f32;
+        println!("  sector1: {{time: TimeShort: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.ob.sector1.time.isPB,  page.ob.sector1.time.isOB,  page.ob.sector1.byId,  page.ob.sector1.onLap,  page.ob.sector1.isSet);
+        let time =  page.ob.sector2.time.TimeInMS as f32 / 1000 as f32;
+        println!("  sector2: {{time: TimeShort: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.ob.sector2.time.isPB,  page.ob.sector2.time.isOB,  page.ob.sector2.byId,  page.ob.sector2.onLap,  page.ob.sector2.isSet);
+        let time =  page.ob.sector3.time.TimeInMS as f32 / 1000 as f32;
+        println!("  sector3: {{time: TimeShort: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.ob.sector3.time.isPB,  page.ob.sector3.time.isOB,  page.ob.sector3.byId,  page.ob.sector3.onLap,  page.ob.sector3.isSet);
+        let time =  page.ob.lapTime.time.TimeInMS as f32 / 1000 as f32;
+        println!("  lapTime: {{time:  TimeLong: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.ob.lapTime.time.isPB,  page.ob.lapTime.time.isOB,  page.ob.lapTime.byId,  page.ob.lapTime.onLap,  page.ob.lapTime.isSet);
+        let time = page.ob.possible.time.TimeInMS as f32 / 1000 as f32;
+        println!(" possible: {{time:  TimeLong: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",  page.ob.possible.time.isPB, page.ob.possible.time.isOB, page.ob.possible.byId, page.ob.possible.onLap, page.ob.possible.isSet);
         println!("}}");
 
         // Footer
