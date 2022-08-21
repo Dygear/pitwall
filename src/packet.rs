@@ -1,20 +1,8 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 use colored::Colorize;
-use std::cmp::Ordering;
 use std::mem::size_of;
 use std::fmt;
-
-static ESC: char      = 27 as char;
-static RESET: &str    = "[0m";
-static _BLACK: &str   = "[30m";
-static RED: &str      = "[31m";
-static GREEN: &str    = "[32m";
-static YELLOW: &str   = "[33m";
-static BLUE: &str     = "[34m";
-static MAGENTA: &str  = "[35m";
-static _CYAN: &str    = "[36m";
-static WHITE: &str    = "[37m";
 
 // https://answers.ea.com/t5/General-Discussion/F1-22-UDP-Specification/td-p/11551274
 
@@ -50,7 +38,7 @@ impl Header
             gameMinorVersion       : bytes[3],
             packetVersion          : bytes[4],
             packetId               : PacketId::from_u8(bytes[5]),
-            sessionUID             : u64::from_le_bytes([bytes[6], bytes[7], bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13]]),
+            sessionUID             : u64::from_le_bytes([bytes[ 6], bytes[ 7], bytes[ 8], bytes[ 9], bytes[10], bytes[11], bytes[12], bytes[13]]),
             sessionTime            : f32::from_le_bytes([bytes[14], bytes[15], bytes[16], bytes[17]]),
             frameIdentifier        : u32::from_le_bytes([bytes[18], bytes[19], bytes[20], bytes[21]]),
             playerCarIndex         : bytes[22],
@@ -811,168 +799,39 @@ impl SessionLength
  * Version: 1
  */
 
-pub enum TimeInMS
-{
-    Lap(TimeLong),
-    Sector(TimeShort),
-    PitLane(TimeShort),
-    PitStop(TimeShort),
-}
-
-#[repr(C, packed)]
-#[derive(Debug, Default, Clone, Copy)]
-pub struct TimeLong
-{
-    pub TimeInMS: u32,
-    // Drived Information
-    pub isPB: bool,                     // Personal Best
-    pub isOB: bool,                     // Overall Best
-}
-
-impl TimeLong
-{
-    pub fn unpack(bytes: &[u8]) -> Self
-    {
-        Self
-        {
-            TimeInMS: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
-            // Drived Information
-            isPB: false,
-            isOB: false,
-        }
-    }
-}
-
-impl PartialOrd for TimeLong
-{
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering>
-    {
-        // Unaligned Memory Access Fix.
-        let this = self.TimeInMS;
-        let time = other.TimeInMS;
-        this.partial_cmp(&time)
-    }
-}
-
-impl PartialEq for TimeLong
-{
-    fn eq(&self, other: &Self) -> bool
-    {
-        self.TimeInMS == other.TimeInMS
-    }
-}
-
-impl fmt::Display for TimeLong
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.isOB
-        {
-            write!(f, "{ESC}{MAGENTA}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
-        }
-        else if self.isPB
-        {
-            write!(f, "{ESC}{GREEN}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
-        }
-        else
-        {
-            write!(f, "{ESC}{YELLOW}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
-        }
-    }
-}
-
-#[repr(C, packed)]
-#[derive(Debug, Default, Clone, Copy)]
-pub struct TimeShort
-{
-    pub TimeInMS: u16,
-    // Drived Information
-    pub isPB: bool,                     // Personal Best
-    pub isOB: bool,                     // Overall Best
-}
-
-impl TimeShort
-{
-    pub fn unpack(bytes: &[u8]) -> Self
-    {
-        Self
-        {
-            TimeInMS: u16::from_le_bytes([bytes[0], bytes[1]]),
-            isPB: false,
-            isOB: false,
-        }
-    }
-}
-
-impl PartialOrd for TimeShort
-{
-    // Unaligned Memory Access Fix.
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering>
-    {
-        let this = self.TimeInMS;
-        let time = other.TimeInMS;
-        this.partial_cmp(&time)
-    }
-}
-
-impl PartialEq for TimeShort
-{
-    fn eq(&self, other: &Self) -> bool
-    {
-        self.TimeInMS == other.TimeInMS
-    }
-}
-
-impl fmt::Display for TimeShort
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.isOB
-        {
-            write!(f, "{ESC}{MAGENTA}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
-        }
-        else if self.isPB
-        {
-            write!(f, "{ESC}{GREEN}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
-        }
-        else
-        {
-            write!(f, "{ESC}{YELLOW}{:.3}{ESC}{RESET}", self.TimeInMS as f32 / 1000 as f32)
-        }
-    }
-}
-
 #[repr(C, packed)] // Size: 43 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Lap
 {
-    pub lastLapTimeInMS: TimeLong,        // u32 - Last lap time in milliseconds
-    pub currentLapTimeInMS: TimeLong,     // u32 - Current time around the lap in milliseconds
-    pub sector1TimeInMS: TimeShort,       // u16 - Sector 1 time in milliseconds
-    pub sector2TimeInMS: TimeShort,       // u16 - Sector 2 time in milliseconds
-    pub lapDistance: f32,                 // f32 - Distance vehicle is around current lap in metres – could
-                                          //       be negative if line hasn’t been crossed yet
-    pub totalDistance: f32,               // f32 - Total distance travelled in session in metres – could
-                                          //        be negative if line hasn’t been crossed yet
-    pub safetyCarDelta: f32,              // f32 - Delta in seconds for safety car
-    pub carPosition: u8,                  // u8  - Car race position
-    pub currentLapNum: u8,                // u8  - Current lap number
-    pub pitStatus: PitStatus,             // u8  - 0 = none, 1 = pitting, 2 = in pit area
-    pub numPitStops: u8,                  // u8  - Number of pit stops taken in this race
-    pub sector: u8,                       // u8  - 0 = sector1, 1 = sector2, 2 = sector3
-    pub currentLapInvalid: u8,            // u8  - Current lap invalid - 0 = valid, 1 = invalid
-    pub penalties: u8,                    // u8  - Accumulated time penalties in seconds to be added
-    pub warnings: u8,                     // u8  - Accumulated number of warnings issued
-    pub numUnservedDriveThroughPens: u8,  // u8  - Num drive through pens left to serve
-    pub numUnservedStopGoPens: u8,        // u8  - Num stop go pens left to serve
-    pub gridPosition: u8,                 // u8  - Grid position the vehicle started the race in
-    pub driverStatus: CarState,           // u8  - Status of driver - 0 = in garage, 1 = flying lap
-                                          //        2 = in lap, 3 = out lap, 4 = on track
-    pub resultStatus: ResultStatus,       // u8  - Result status - 0 = invalid, 1 = inactive, 2 = active
-                                          //        3 = finished, 4 = didnotfinish, 5 = disqualified
-                                          //        6 = not classified, 7 = retired
-    pub pitLaneTimerActive: u8,           // u8  - Pit lane timing, 0 = inactive, 1 = active
-    pub pitLaneTimeInLaneInMS: TimeShort, // u16 - If active, the current time spent in the pit lane in ms
-    pub pitStopTimerInMS: TimeShort,      // u16 - Time of the actual pit stop in ms
-    pub pitStopShouldServePen: u8,        // u8  - Whether the car should serve a penalty at this stop
+    pub lastLapTimeInMS: u32,               // u32 - Last lap time in milliseconds
+    pub currentLapTimeInMS: u32,            // u32 - Current time around the lap in milliseconds
+    pub sector1TimeInMS: u16,               // u16 - Sector 1 time in milliseconds
+    pub sector2TimeInMS: u16,               // u16 - Sector 2 time in milliseconds
+    pub lapDistance: f32,                   // f32 - Distance vehicle is around current lap in metres – could
+                                            //       be negative if line hasn’t been crossed yet
+    pub totalDistance: f32,                 // f32 - Total distance travelled in session in metres – could
+                                            //        be negative if line hasn’t been crossed yet
+    pub safetyCarDelta: f32,                // f32 - Delta in seconds for safety car
+    pub carPosition: u8,                    // u8  - Car race position
+    pub currentLapNum: u8,                  // u8  - Current lap number
+    pub pitStatus: PitStatus,               // u8  - 0 = none, 1 = pitting, 2 = in pit area
+    pub numPitStops: u8,                    // u8  - Number of pit stops taken in this race
+    pub sector: u8,                         // u8  - 0 = sector1, 1 = sector2, 2 = sector3
+    pub currentLapInvalid: u8,              // u8  - Current lap invalid - 0 = valid, 1 = invalid
+    pub penalties: u8,                      // u8  - Accumulated time penalties in seconds to be added
+    pub warnings: u8,                       // u8  - Accumulated number of warnings issued
+    pub numUnservedDriveThroughPens: u8,    // u8  - Num drive through pens left to serve
+    pub numUnservedStopGoPens: u8,          // u8  - Num stop go pens left to serve
+    pub gridPosition: u8,                   // u8  - Grid position the vehicle started the race in
+    pub driverStatus: CarState,             // u8  - Status of driver - 0 = in garage, 1 = flying lap
+                                            //        2 = in lap, 3 = out lap, 4 = on track
+    pub resultStatus: ResultStatus,         // u8  - Result status - 0 = invalid, 1 = inactive, 2 = active
+                                            //        3 = finished, 4 = didnotfinish, 5 = disqualified
+                                            //        6 = not classified, 7 = retired
+    pub pitLaneTimerActive: u8,             // u8  - Pit lane timing, 0 = inactive, 1 = active
+    pub pitLaneTimeInLaneInMS: u16,         // u16 - If active, the current time spent in the pit lane in ms
+    pub pitStopTimerInMS: u16,              // u16 - Time of the actual pit stop in ms
+    pub pitStopShouldServePen: u8,          // u8  - Whether the car should serve a penalty at this stop
 }
 
 impl Lap
@@ -980,10 +839,10 @@ impl Lap
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            lastLapTimeInMS            : TimeLong::unpack(&bytes[ 0.. 4]),
-            currentLapTimeInMS         : TimeLong::unpack(&bytes[ 4.. 8]),
-            sector1TimeInMS            : TimeShort::unpack(&bytes[ 8..10]),
-            sector2TimeInMS            : TimeShort::unpack(&bytes[10..12]),
+            lastLapTimeInMS            : u32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
+            currentLapTimeInMS         : u32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
+            sector1TimeInMS            : u16::from_le_bytes([bytes[ 8], bytes[ 9]]),
+            sector2TimeInMS            : u16::from_le_bytes([bytes[10], bytes[12]]),
             lapDistance                : f32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
             totalDistance              : f32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]),
             safetyCarDelta             : f32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
@@ -1001,8 +860,8 @@ impl Lap
             driverStatus               : CarState::from_u8(bytes[35]),
             resultStatus               : ResultStatus::from_u8(bytes[36]),
             pitLaneTimerActive         : bytes[37],
-            pitLaneTimeInLaneInMS      : TimeShort::unpack(&bytes[38..40]),
-            pitStopTimerInMS           : TimeShort::unpack(&bytes[40..42]),
+            pitLaneTimeInLaneInMS      : u16::from_le_bytes([bytes[38], bytes[40]]),
+            pitStopTimerInMS           : u16::from_le_bytes([bytes[40], bytes[42]]),
             pitStopShouldServePen      : bytes[42],
         }
     }
@@ -2497,7 +2356,7 @@ pub struct FinalClassification
     pub points: u8,                 // Number of points scored
     pub numPitStops: u8,            // Number of pit stops made
     pub resultStatus: ResultStatus, // u8
-    pub bestLapTimeInMS: TimeLong,  // Best lap time of the session in milliseconds
+    pub bestLapTimeInMS: u32,       // Best lap time of the session in milliseconds
     pub totalRaceTime: f64,         // Total race time in seconds without penalties
     pub penaltiesTime: u8,          // Total penalties accumulated in seconds
     pub numPenalties: u8,           // Number of penalties applied to this driver
@@ -2519,14 +2378,14 @@ impl FinalClassification
                        points:                       bytes[ 3],
                   numPitStops:                       bytes[ 4],
                  resultStatus: ResultStatus::from_u8(bytes[ 5]),
-              bestLapTimeInMS:     TimeLong::unpack(&bytes[ 6..10]),
+              bestLapTimeInMS:   u32::from_le_bytes([bytes[ 6], bytes[ 7], bytes[ 8], bytes[ 9]]),
                 totalRaceTime:   f64::from_le_bytes([bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15], bytes[16], bytes[17]]),
                 penaltiesTime:                       bytes[18],
                  numPenalties:                       bytes[19],
                 numTyreStints:                       bytes[20],
              tyreStintsActual:     Self::actualTyre(&bytes[21..29]),
              tyreStintsVisual:     Self::visualTyre(&bytes[29..37]),
-            tyreStintsEndLaps:[bytes[37], bytes[38], bytes[39], bytes[40], bytes[41], bytes[42], bytes[43], bytes[44]],
+            tyreStintsEndLaps:                      [bytes[37], bytes[38], bytes[39], bytes[40], bytes[41], bytes[42], bytes[43], bytes[44]],
         }
     }
 
@@ -2883,10 +2742,10 @@ impl Valid
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LapHistory
 {
-    pub lapTimeInMS: TimeLong,          // u32 Lap time in milliseconds
-    pub sector1TimeInMS: TimeShort,     // u16 Sector 1 time in milliseconds
-    pub sector2TimeInMS: TimeShort,     // u16 Sector 2 time in milliseconds
-    pub sector3TimeInMS: TimeShort,     // u16 Sector 3 time in milliseconds
+    pub lapTimeInMS: u32,               // u32 Lap time in milliseconds
+    pub sector1TimeInMS: u16,           // u16 Sector 1 time in milliseconds
+    pub sector2TimeInMS: u16,           // u16 Sector 2 time in milliseconds
+    pub sector3TimeInMS: u16,           // u16 Sector 3 time in milliseconds
     pub lapValidBitFlags: Valid,        // u8 - 0x01 bit set-lap valid, 0x02 bit set-sector 1 valid 0x04 bit set-sector 2 valid, 0x08 bit set-sector 3 valid
 }
 
@@ -2895,11 +2754,11 @@ impl LapHistory
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            lapTimeInMS     :  TimeLong::unpack(&bytes[ 0.. 4]),
-            sector1TimeInMS : TimeShort::unpack(&bytes[ 4.. 6]),
-            sector2TimeInMS : TimeShort::unpack(&bytes[ 6.. 8]),
-            sector3TimeInMS : TimeShort::unpack(&bytes[ 8..10]),
-            lapValidBitFlags:    Valid::from_u8(&bytes[10])
+            lapTimeInMS     : u32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
+            sector1TimeInMS : u16::from_le_bytes([bytes[ 4], bytes[ 5]]),
+            sector2TimeInMS : u16::from_le_bytes([bytes[ 6], bytes[ 8]]),
+            sector3TimeInMS : u16::from_le_bytes([bytes[ 8], bytes[10]]),
+            lapValidBitFlags: Valid::from_u8(&bytes[10])
         }
     }
 }

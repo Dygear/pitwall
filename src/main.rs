@@ -5,15 +5,6 @@ use colored::*;
 use std::fmt;
 
 static ESC: char      = 27 as char;
-static RESET: &str    = "[0m";
-static _BLACK: &str   = "[30m";
-static RED: &str      = "[31m";
-static GREEN: &str    = "[32m";
-static YELLOW: &str   = "[33m";
-static BLUE: &str     = "[34m";
-static MAGENTA: &str  = "[35m";
-static _CYAN: &str    = "[36m";
-static WHITE: &str    = "[37m";
 
 mod packet;
 use packet::*;
@@ -57,7 +48,37 @@ impl Driver
     {
         format!(
             "{} ({:2})",
-            if self.isAI { self.name.white() } else { self.name.yellow() },
+               format!("{:>19}", match self.underFlag {
+                    ZoneFlag::Green => {
+                        if self.isAI {
+                            self.name.white().on_green()
+                        } else {
+                            self.name.yellow().on_green()
+                        }
+                    },
+                    ZoneFlag::Blue => {
+                        if self.isAI {
+                            self.name.white().on_blue()
+                        } else {
+                            self.name.yellow().on_blue()
+                        }
+                    },
+                    ZoneFlag::Yellow => {
+                        if self.isAI {
+                            self.name.white().on_yellow()
+                        } else {
+                            self.name.black().on_yellow()
+                        }
+                    },
+                    _ => {
+                        if self.isAI {
+                            self.name.white()
+                        } else {
+                            self.name.yellow()
+                        }
+                    },
+                }
+            ),
             self.number,
         )
     }
@@ -78,6 +99,25 @@ struct DRS
     pub isOpen: bool,                   // drs
     // PacketCarStatus.carStatusData
     pub isAllowed: bool,                // drsAllowed
+}
+
+impl fmt::Display for DRS
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        if self.isOpen
+        {
+            write!(f, "[{}]", "DRS".black().on_green())
+        }
+        else if self.isAllowed
+        {
+            write!(f, "[{}]", "DRS".green())
+        }
+        else
+        {
+            write!(f, "[{}]", "DRS")
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -103,13 +143,63 @@ impl fmt::Display for Tyres
     {
         match self.visual
         {
-            VisualCompound::OldHard     | VisualCompound::Hard   => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = WHITE  ),
-            VisualCompound::OldMedium   | VisualCompound::Medium => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = YELLOW ),
-            VisualCompound::OldSoft     | VisualCompound::Soft   => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = RED    ),
-            VisualCompound::OldSuperSoft                         => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = MAGENTA),
-            VisualCompound::Inter                                => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = GREEN  ),
-            VisualCompound::OldWet      | VisualCompound::Wet    => write!(f, "{ESC}{color}({ESC}{RESET}{}{ESC}{color}){ESC}{RESET}", self.visual, color = BLUE   ),
-                                                               _ => write!(f, "{}", self.actual)
+            VisualCompound::OldHard     | VisualCompound::Hard   => {
+                write!(
+                    f,
+                    "{}{}{}", 
+                    format!("{}", "(".white()),
+                    format!("{}", self.visual),
+                    format!("{}", ")".white()),
+                )
+            },
+            VisualCompound::OldMedium   | VisualCompound::Medium => {
+                write!(
+                    f,
+                    "{}{}{}",
+                    format!("{}", "(".yellow()),
+                    format!("{}", self.visual),
+                    format!("{}", ")".yellow()),
+                )
+            },
+            VisualCompound::OldSoft     | VisualCompound::Soft   => {
+                write!(
+                    f,
+                    "{}{}{}",
+                    format!("{}", "(".red()),
+                    format!("{}", self.visual),
+                    format!("{}", ")".red()),
+                )
+            },
+            VisualCompound::OldSuperSoft                         => {
+                write!(
+                    f,
+                    "{}{}{}",
+                    format!("{}", "(".magenta()),
+                    format!("{}", self.visual),
+                    format!("{}", ")".magenta()),
+                )
+            },
+            VisualCompound::Inter                                => {
+                write!(
+                    f,
+                    "{}{}{}",
+                    format!("{}", "(".green()),
+                    format!("{}", self.visual),
+                    format!("{}", ")".green())
+                )
+            },
+            VisualCompound::OldWet      | VisualCompound::Wet    => {
+                write!(
+                    f,
+                    "{}{}{}",
+                    format!("{}", "(".blue()),
+                    format!("{}", self.visual),
+                    format!("{}", ")".blue()),
+                )
+            },
+                                                               _ => {
+                write!(f, "{}", self.actual)
+            }
         }
     }
 }
@@ -128,11 +218,11 @@ struct Telemetry
 struct Time
 {
     // PacketLap.laps
-    pub sector1: TimeShort,             // sector1TimeInMS
-    pub sector2: TimeShort,             // sector2TimeInMS
-    pub sector3: TimeShort,             // sector2TimeInMS
-    pub lastLap: TimeLong,              // lastLapTimeInMS
-    pub current: TimeLong,              // currentLapTimeInMS
+    pub sector1: Sector,                // sector1TimeInMS
+    pub sector2: Sector,                // sector2TimeInMS
+    pub sector3: Sector,                // sector2TimeInMS
+    pub lastLap: Lap,                   // lastLapTimeInMS
+    pub current: Lap,                   // currentLapTimeInMS
 }
 
 #[derive(Debug, Default, Clone)]
@@ -156,48 +246,144 @@ struct Car
 }
 
 #[derive(Debug, Default, Clone, Copy)]
-struct Lap {
+struct SessionLap {
     pub leader: u8,                     // MAX of PacketLap.laps.currentLapNum
     pub total: u8,                      // PacketSession.totalLaps
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-struct BestSector {
-    pub time: TimeShort,                // MIN of PacketLap.laps.{sector1TimeInMS,sector2TimeInMS} Calc of sector3TimeInMS
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+struct Sector {
+    pub time: u16,                      // MIN of PacketLap.laps.{sector1TimeInMS,sector2TimeInMS} Calc of sector3TimeInMS
     pub byId: u8,                       // Driver Index Number
     pub onLap: u8,                      // PacketLap.laps.currentLapNum
     pub isSet: bool,                    // Has this been set yet?
+    pub isOB: bool,                     // Is Overall Best?
+    pub isPB: bool,                     // Is Personal Best?
 }
 
-impl fmt::Display for BestSector
+impl fmt::Display for Sector
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.3}", self.time.TimeInMS as f32 / 1000 as f32)
+        write!(f, "{:.3}", self.time as f32 / 1000 as f32)
     }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
-struct BestLap {
-    pub time: TimeLong,                 // MIN of PacketLap.laps.{lastLapTimeInMS}
+struct Lap {
+    pub time: u32,                      // MIN of PacketLap.laps.{lastLapTimeInMS}
     pub byId: u8,                       // Driver Index Number
     pub onLap: u8,                      // PacketLap.laps.currentLapNum
     pub isSet: bool,                    // Has this been set yet?
+    pub isOB: bool,                     // Is Overall Best?
+    pub isPB: bool,                     // Is Personal Best?
 }
 
-impl fmt::Display for BestLap
+impl fmt::Display for Lap
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.3}", self.time.TimeInMS as f32 / 1000 as f32)
+        write!(f, "{:.3}", self.time as f32 / 1000 as f32)
     }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
-struct Bests {
-    pub sector1: BestSector,
-    pub sector2: BestSector,
-    pub sector3: BestSector,
-    pub lapTime: BestLap,
-    pub possible: BestLap,
+struct Best {
+    pub sector1: Sector,
+    pub sector2: Sector,
+    pub sector3: Sector,
+    pub lapTime: Lap,
+    pub possible: u32,
+}
+
+enum Period
+{
+    Sector1,
+    Sector2,
+    Sector3,
+    LapTime,
+}
+
+impl Best
+{
+    pub fn isBest(&mut self, period: Period, time: u32, id: u8, lap: u8) -> bool
+    {
+        match period {
+            Period::Sector1 => {
+                if !self.sector1.isSet || self.sector1.time as u32 > time
+                {
+                    self.sector1.time = time as u16;
+                    self.sector1.isSet = true;
+                    self.sector1.byId = id;
+                    self.sector1.onLap = lap;
+                    self.update_possible();
+                    true
+                }
+                else
+                {
+                    false
+                }
+            },
+            Period::Sector2 => {
+                if !self.sector1.isSet || self.sector2.time as u32 > time
+                {
+                    self.sector2.time = time as u16;
+                    self.sector2.isSet = true;
+                    self.sector2.byId = id;
+                    self.sector2.onLap = lap;
+                    self.update_possible();
+                    true
+                }
+                else
+                {
+                    false
+                }
+            },
+            Period::Sector3 => {
+                if !self.sector3.isSet || self.sector3.time as u32 > time
+                {
+                    self.sector3.time = time as u16;
+                    self.sector3.isSet = true;
+                    self.sector3.byId = id;
+                    self.sector3.onLap = lap;
+                    self.update_possible();
+                    true
+                }
+                else
+                {
+                    false
+                }
+            },
+            Period::LapTime => {
+                if !self.lapTime.isSet || self.lapTime.time > time
+                {
+                    self.lapTime.time = time;
+                    self.lapTime.isSet = true;
+                    self.lapTime.byId = id;
+                    self.lapTime.onLap = lap;
+                    self.update_possible();
+                    true
+                }
+                else
+                {
+                    false
+                }
+            },
+        }
+    }
+
+    pub fn update_possible(&mut self) -> bool
+    {
+        if self.sector1.isSet && self.sector2.isSet && self.sector3.isSet
+        {
+            let newBestPossible: u32 = self.sector1.time as u32 + self.sector2.time as u32 + self.sector3.time as u32;
+
+            if self.possible == 0 || self.possible > newBestPossible
+            {
+                self.possible = newBestPossible;
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -207,10 +393,10 @@ struct Page
     playerCarIndex: u8,                 // Always the last item, and so gives you the bounds of the array.
     positions: [usize; 22],
     r#type: Session,                    // PacketSession.sessionType
-    ob: Bests,
-    pb: [Bests; 22],
-    cars: [Car; 22],
-    lap: Lap,
+    ob: Best,
+    pb: [Best; 22],
+    car: [Car; 22],
+    lap: SessionLap,
 }
 
 fn main() {
@@ -297,15 +483,15 @@ fn main() {
                 {
                     let idx = i as usize;
 
-                    page.cars[idx].driver.isAI               = p.participants[idx].aiControlled == 1;
-                    page.cars[idx].driver.id                 = p.participants[idx].driverId;
-                    page.cars[idx].driver.idNetwork          = p.participants[idx].networkId;
-                    page.cars[idx].team.id                   = p.participants[idx].teamId;
-                    page.cars[idx].team.isCustom             = p.participants[idx].myTeam == 1;
-                    page.cars[idx].driver.number             = p.participants[idx].raceNumber;
-                    page.cars[idx].driver.nationality        = p.participants[idx].nationality;
-                    page.cars[idx].driver.name               = p.participants[idx].name_to_string();
-                    page.cars[idx].driver.isTelemetryEnabled = p.participants[idx].yourTelemetry == 1;
+                    page.car[idx].driver.isAI               = p.participants[idx].aiControlled == 1;
+                    page.car[idx].driver.id                 = p.participants[idx].driverId;
+                    page.car[idx].driver.idNetwork          = p.participants[idx].networkId;
+                    page.car[idx].team.id                   = p.participants[idx].teamId;
+                    page.car[idx].team.isCustom             = p.participants[idx].myTeam == 1;
+                    page.car[idx].driver.number             = p.participants[idx].raceNumber;
+                    page.car[idx].driver.nationality        = p.participants[idx].nationality;
+                    page.car[idx].driver.name               = p.participants[idx].name_to_string();
+                    page.car[idx].driver.isTelemetryEnabled = p.participants[idx].yourTelemetry == 1;
                 }
             }
             Packet::CarTelemetry(t) => {
@@ -313,11 +499,11 @@ fn main() {
                 {
                     let idx = i as usize;
 
-                    page.cars[idx].DRS.isOpen                = t.carTelemetry[idx].drs == 1;
-                    page.cars[idx].telemetry.speed           = t.carTelemetry[idx].speed;
-                    page.cars[idx].telemetry.gear            = t.carTelemetry[idx].gear;
-                    page.cars[idx].telemetry.rpm             = t.carTelemetry[idx].engineRPM;
-                    page.cars[idx].telemetry.leds            = t.carTelemetry[idx].revLightsBitValue;
+                    page.car[idx].DRS.isOpen                = t.carTelemetry[idx].drs == 1;
+                    page.car[idx].telemetry.speed           = t.carTelemetry[idx].speed;
+                    page.car[idx].telemetry.gear            = t.carTelemetry[idx].gear;
+                    page.car[idx].telemetry.rpm             = t.carTelemetry[idx].engineRPM;
+                    page.car[idx].telemetry.leds            = t.carTelemetry[idx].revLightsBitValue;
                 }
 
             }
@@ -326,13 +512,13 @@ fn main() {
                 {
                     let idx = i as usize;
 
-                    page.cars[idx].DRS.isAllowed             = s.carStatus[idx].drsAllowed == 1;
-                    page.cars[idx].assist.TC                 = s.carStatus[idx].tractionControl;
-                    page.cars[idx].assist.ABS                = s.carStatus[idx].antiLockBrakes;
-                    page.cars[idx].tyres.actual              = s.carStatus[idx].actualTyre;
-                    page.cars[idx].tyres.visual              = s.carStatus[idx].visualTyre;
-                    page.cars[idx].tyres.age                 = s.carStatus[idx].tyresAgeLaps;
-                    page.cars[idx].driver.underFlag          = s.carStatus[idx].vehicleFiaFlags;
+                    page.car[idx].DRS.isAllowed             = s.carStatus[idx].drsAllowed == 1;
+                    page.car[idx].assist.TC                 = s.carStatus[idx].tractionControl;
+                    page.car[idx].assist.ABS                = s.carStatus[idx].antiLockBrakes;
+                    page.car[idx].tyres.actual              = s.carStatus[idx].actualTyre;
+                    page.car[idx].tyres.visual              = s.carStatus[idx].visualTyre;
+                    page.car[idx].tyres.age                 = s.carStatus[idx].tyresAgeLaps;
+                    page.car[idx].driver.underFlag          = s.carStatus[idx].vehicleFiaFlags;
                 }
             }
             Packet::Lap(l) => {
@@ -340,8 +526,11 @@ fn main() {
                 {
                     let idx = i as usize;
                     let lap = &l.laps[idx];
-                    let car = &mut page.cars[idx];
+                    let car = &mut page.car[idx];
                     let pos = lap.carPosition as usize;
+
+                    // Update car positions.
+                    page.positions[pos] = idx;
 
                     // Skip empty slots.
                     if pos == 0
@@ -355,136 +544,73 @@ fn main() {
                         page.lap.leader = lap.currentLapNum;
                     }
 
-                    // Current Lap Time
-                    car.time.current.TimeInMS = lap.currentLapTimeInMS.TimeInMS;
-
-                    // Last Lap Time
-                    car.time.lastLap.TimeInMS = lap.lastLapTimeInMS.TimeInMS;
-
-                    // Update car positions.
-                    page.positions[pos] = idx;
-
                     match lap.sector
                     {
                         0 => {
+                            // First time this car is in this sector on this lap.
+                            if car.lapNum != lap.currentLapNum
+                            {
+                                // Sector 3 Time
+                                car.time.sector3.time = (
+                                    (
+                                        car.time.sector1.time as u32 +
+                                        car.time.sector2.time as u32
+                                    ) + lap.lastLapTimeInMS   as u32
+                                ) as u16;
+
+                                page.ob     .sector3.isOB = page.ob     .isBest(Period::Sector3, car.time.sector3.time as u32, i, lap.currentLapNum);
+                                page.pb[idx].sector3.isPB = page.pb[idx].isBest(Period::Sector3, car.time.sector3.time as u32, i, lap.currentLapNum);
+
+                                // Lap Time
+                                page.ob     .lapTime.isOB = page.ob     .isBest(Period::LapTime, lap.lastLapTimeInMS   as u32, i, lap.currentLapNum);
+                                page.pb[idx].lapTime.isPB = page.pb[idx].isBest(Period::LapTime, lap.lastLapTimeInMS   as u32, i, lap.currentLapNum);
+
+                            }
+
                             // Sector 1 Real Time
-                            car.time.sector1.TimeInMS =  lap.currentLapTimeInMS.TimeInMS as u16;
-
-                            // As this is sector 1, we need to find out of this is the first lap as well.
-                            // If so, we skip it, as there is not enough information for a sector time yet.
-                            if lap.currentLapNum == 1
-                            {
-                                continue;
-                            }
-
-                            // If this isn't our first packet in this lap, we don't need to check best lap / sector 3 times.
-                            if lap.currentLapNum == car.lapNum
-                            {
-                                continue;
-                            }
-
-                            // Last Lap
-                            // Best Overall
-                            if !page.ob.lapTime.isSet || page.ob.lapTime.time > car.time.lastLap
-                            {
-                                car.time.lastLap.isOB = true;
-                                page.ob.lapTime.time = car.time.lastLap;
-                                page.ob.lapTime.isSet = true;
-                            } else {
-                                car.time.lastLap.isOB = false;
-                            }
-
-                            // Sector 3
-                            // Best Overall
-                            if !page.ob.sector3.isSet || page.ob.sector3.time > car.time.sector3
-                            {
-                                car.time.sector3.isOB = true;
-                                page.ob.sector3.time = car.time.sector3;
-                                page.ob.sector3.isSet = true;
-                            } else {
-                                car.time.sector3.isOB = false;
-                            }
-
-                            // Personal Best
-                            if !page.pb[idx].sector3.isSet || page.pb[idx].sector3.time > car.time.sector3
-                            {
-                                car.time.sector3.isPB = true;
-                                page.pb[idx].sector3.time = car.time.sector3;
-                                page.pb[idx].sector3.isSet = true;
-                            } else {
-                                car.time.sector3.isPB = false;
-                            }
+                            car.time.sector1.time =  lap.currentLapTimeInMS as u16;
                         },
                         1 => {
+                            // First time this car is in this sector on this lap.
+                            if car.sector != lap.sector
+                            {
+                                // Take the actual connocial time.
+                                car.time.sector1.time = lap.sector1TimeInMS;
+
+                                page.ob     .sector1.isOB = page.ob     .isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, lap.currentLapNum);
+                                page.pb[idx].sector1.isPB = page.pb[idx].isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, lap.currentLapNum);
+                            }
+
                             // Sector 2 Real Time
-                            car.time.sector2.TimeInMS = (lap.currentLapTimeInMS.TimeInMS -  car.time.sector1.TimeInMS as u32) as u16;
-
-                            // Only process this the first time around.
-                            if car.time.sector1.TimeInMS != 0
-                            {
-                                continue;
-                            }
-
-                            // Best Overall
-                            if !page.ob.sector1.isSet || page.ob.sector1.time > car.time.sector1
-                            {
-                                car.time.sector1.isOB = true;
-                                page.ob.sector1.time = car.time.sector1;
-                                page.ob.sector1.isSet = true;
-                            } else {
-                                car.time.sector1.isOB = false;
-                            }
-
-                            // Personal Best
-                            if !page.pb[idx].sector1.isSet || page.pb[idx].sector1.time > car.time.sector1
-                            {
-                                car.time.sector1.isPB = true;
-                                page.pb[idx].sector1.time = car.time.sector1;
-                                page.pb[idx].sector1.isSet = true;
-                            } else {
-                                car.time.sector1.isPB = false;
-                            }
-
-                            // Update our last known car state.
-                            car.time.sector1 = lap.sector1TimeInMS;
+                            car.time.sector2.time = (lap.currentLapTimeInMS -  car.time.sector1.time as u32) as u16;
                         },
                         2 => {
+                            // First time this car is in this sector on this lap.
+                            if car.sector != lap.sector
+                            {
+                                // Take the actual connocial time.
+                                car.time.sector2.time = lap.sector2TimeInMS;
+
+                                page.ob     .sector2.isOB = page.ob     .isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, lap.currentLapNum);
+                                page.pb[idx].sector2.isPB = page.pb[idx].isBest(Period::Sector2, lap.sector1TimeInMS as u32, i, lap.currentLapNum);
+                            }
+
                             // Sector 3 Real Time
-                            car.time.sector3.TimeInMS = (lap.currentLapTimeInMS.TimeInMS - (car.time.sector1.TimeInMS as u32 + car.time.sector2.TimeInMS as u32) as u32) as u16;
-
-                            // Only process this the first time around.
-                            if car.time.sector2.TimeInMS != 0
-                            {
-                                continue;
-                            }
-
-                            // Best Overall
-                            if !page.ob.sector2.isSet || page.ob.sector2.time > car.time.sector2
-                            {
-                                car.time.sector2.isOB = true;
-                                page.ob.sector2.time = car.time.sector2;
-                                page.ob.sector2.isSet = true;
-                            } else {
-                                car.time.sector2.isOB = false;
-                            }
-
-                            // Personal Best
-                            if !page.pb[idx].sector2.isSet || page.pb[idx].sector2.time > car.time.sector2
-                            {
-                                car.time.sector2.isPB = true;
-                                page.pb[idx].sector2.time = car.time.sector2;
-                                page.pb[idx].sector2.isSet = true;
-                            } else {
-                                car.time.sector2.isPB = false;
-                            }
-
-                            // Update our last known car state.
-                            car.time.sector2 = lap.sector2TimeInMS;
+                            car.time.sector3.time = (
+                                (
+                                    car.time.sector1.time as u32 +
+                                    car.time.sector2.time as u32
+                                ) + lap.currentLapTimeInMS
+                            ) as u16;
                         },
                         _ => unreachable!()
+
                     }
 
                     // Now update the remaining new informaiton.
+                    car.time.current.time = lap.currentLapTimeInMS;
+                    car.time.lastLap.time = lap.lastLapTimeInMS;
+
                     car.spotGrid    = lap.gridPosition;
                     car.spotRace    = lap.carPosition;
                     car.lapNum      = lap.currentLapNum;
@@ -509,7 +635,7 @@ fn main() {
 
         // Header
             println!(
-                "{idx:2} {pos:2} {driver:>24} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:^3} {tyre:^4} {status:>6} {sector:>6} | {revLights:>15} {gear} {speed}",
+                "{idx:2} {pos:2} {driver:>19} (##) {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:>3} {tyre:^4} | {gear} {speed} {DRS:^5}",
                 idx         = "ID",
                 pos         = "P",
                 driver      = "Driver",
@@ -520,11 +646,9 @@ fn main() {
                 timeCurrent = "Time",
                 lap         = "Lap",
                 tyre        = "Tyre",
-                status      = "Status",
-                revLights   = "RevLights",
                 gear        = "Gear",
                 speed       = "KPH",
-                sector      = "Sector"
+                DRS         = "DRS"
             );
 
         // Cars
@@ -538,10 +662,10 @@ fn main() {
                 continue
             }
 
-            let car = &page.cars[*idx];
+            let car = &page.car[*idx];
 
             println!(
-                "{idx:02} {pos:02} {driver:>33} {timeLastLap:>16} | {timeSector1:>16} {timeSector2:>16} {timeSector3:>16} | {timeCurrent:>16} | {lap:^3} {tyre:^4}  {status:>6} {sector:>6} | {revLights} {gear:>4} {speed:>3}",
+                "{idx:02} {pos:02} {driver:>33} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:>3} {tyre:^5} | {gear:>4} {speed:>3} {DRS}",
                 driver      = car.driver.getDriver(),
                 timeLastLap = format!("{}", car.time.lastLap),
                 timeSector1 = format!("{}", car.time.sector1),
@@ -550,11 +674,9 @@ fn main() {
                 timeCurrent = format!("{}", car.time.current),
                 lap         = car.lapNum,
                 tyre        = format!("{}", car.tyres),
-                status      = format!("{}", car.carStatus),
-                revLights   = car.telemetry.leds,
                 gear        = format!("{}", car.telemetry.gear),
                 speed       = format!("{}", car.telemetry.speed),
-                sector      = car.sector
+                DRS         = car.DRS
             );
         }
 
@@ -562,51 +684,23 @@ fn main() {
         println!("");
 
         // Bests
-            println!(
-                "{idx:2} {pos:2} {driver:>24} {bestLapTime:>7} | {bestSector1:>7} {bestSector2:>7} {bestSector3:>7} | {bestPossible:>7} | {lap:^3} {tyre:^4} {status:>6}",
-                idx         = "",
-                pos         = "",
-                driver      = "Bests",
-                bestLapTime = format!("{}", page.ob.lapTime),
-                bestSector1 = format!("{}", page.ob.sector1),
-                bestSector2 = format!("{}", page.ob.sector2),
-                bestSector3 = format!("{}", page.ob.sector3),
-                bestPossible= format!("{}", page.ob.possible),
-                lap         = "",
-                tyre        = "",
-                status      = "",
-            );
-
-        println!("Bests: {{");
-        let time =  page.ob.sector1.time.TimeInMS as f32 / 1000 as f32;
-        println!("  sector1: {{time: TimeShort: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.ob.sector1.time.isPB,  page.ob.sector1.time.isOB,  page.ob.sector1.byId,  page.ob.sector1.onLap,  page.ob.sector1.isSet);
-        let time =  page.ob.sector2.time.TimeInMS as f32 / 1000 as f32;
-        println!("  sector2: {{time: TimeShort: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.ob.sector2.time.isPB,  page.ob.sector2.time.isOB,  page.ob.sector2.byId,  page.ob.sector2.onLap,  page.ob.sector2.isSet);
-        let time =  page.ob.sector3.time.TimeInMS as f32 / 1000 as f32;
-        println!("  sector3: {{time: TimeShort: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.ob.sector3.time.isPB,  page.ob.sector3.time.isOB,  page.ob.sector3.byId,  page.ob.sector3.onLap,  page.ob.sector3.isSet);
-        let time =  page.ob.lapTime.time.TimeInMS as f32 / 1000 as f32;
-        println!("  lapTime: {{time:  TimeLong: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",   page.ob.lapTime.time.isPB,  page.ob.lapTime.time.isOB,  page.ob.lapTime.byId,  page.ob.lapTime.onLap,  page.ob.lapTime.isSet);
-        let time = page.ob.possible.time.TimeInMS as f32 / 1000 as f32;
-        println!(" possible: {{time:  TimeLong: {{TimeInMS: {time:>7}, isPB: {}, isOB: {}}}, byId: {:>2}, onLap: {}, isSet: {:>5}}},",  page.ob.possible.time.isPB, page.ob.possible.time.isOB, page.ob.possible.byId, page.ob.possible.onLap, page.ob.possible.isSet);
-        println!("}}");
+        println!(
+            "{idx:2} {pos:2} {driver:>24} {bestLapTime:>7} | {bestSector1:>7} {bestSector2:>7} {bestSector3:>7} | {bestPossible:>7} | {lap:>3} {tyre:^5} {status:>6}",
+            idx         = "",
+            pos         = "",
+            driver      = "Bests",
+            bestLapTime = format!("{}", page.ob.lapTime),
+            bestSector1 = format!("{}", page.ob.sector1),
+            bestSector2 = format!("{}", page.ob.sector2),
+            bestSector3 = format!("{}", page.ob.sector3),
+            bestPossible= format!("{}", page.ob.possible),
+            lap         = "",
+            tyre        = "",
+            status      = "",
+        );
 
         // Footer
         println!("");
 
     }
-}
-
-fn update_possible(best: &mut Bests) -> bool
-{
-    if best.sector1.isSet && best.sector2.isSet && best.sector3.isSet
-    {
-        let newBestPossible: u32 = best.sector1.time.TimeInMS as u32 + best.sector2.time.TimeInMS as u32 + best.sector3.time.TimeInMS as u32;
-
-        if !best.possible.isSet || best.possible.time.TimeInMS > newBestPossible
-        {
-            best.possible.time.TimeInMS = newBestPossible;
-            return true;
-        }
-    }
-    return false;
 }
