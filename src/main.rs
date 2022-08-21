@@ -48,7 +48,7 @@ impl Driver
     {
         format!(
             "{} ({:2})",
-               format!("{:>19}", match self.underFlag {
+               format!("{:>15}", match self.underFlag {
                     ZoneFlag::Green => {
                         if self.isAI {
                             self.name.white().on_green()
@@ -264,7 +264,28 @@ struct Time {
 impl fmt::Display for Time
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.3}", self.inMS as f32 / 1000 as f32)
+        let minutes = self.inMS / 60000;
+
+        let time = if minutes > 0
+        {
+            let seconds =(self.inMS -(60000 * minutes)) / 1000;
+            let milisec = self.inMS % 1000;
+            format!("{}:{:02}.{:03}", minutes, seconds, milisec)
+        } else {
+            format!("{:.3}", self.inMS as f32 / 1000 as f32)
+        };
+
+        write!(
+            f,
+            "{}",
+            if self.isOB {
+                format!("{:>8}", time.purple())
+            } else if self.isPB {
+                format!("{:>8}", time.green())
+            } else {
+                time
+            }
+        )
     }
 }
 
@@ -569,7 +590,7 @@ fn main() {
                             // This is our first time in this sector.
                             if lap.sector != car.sector
                             {
-                                car.time.sector1.inMS = lap.sector2TimeInMS as u32;
+                                car.time.sector2.inMS = lap.sector2TimeInMS as u32;
                                 car.time.sector2.isOB = page.ob.isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, car.lapNum);
                             }
 
@@ -581,8 +602,6 @@ fn main() {
                     }
 
                     // Now update the remaining new informaiton.
-                    car.time.sector1.inMS = lap.sector1TimeInMS as u32;
-                    car.time.sector2.inMS = lap.sector2TimeInMS as u32;
                     car.time.current.inMS = lap.currentLapTimeInMS;
                     car.time.lastLap.inMS = lap.lastLapTimeInMS;
 
@@ -610,7 +629,7 @@ fn main() {
 
         // Header
             println!(
-                "{idx:2} {pos:2} {driver:>19} (##) {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:>3} {sector} {tyre:^4} | {gear} {speed} {DRS:^5}",
+                "{idx:2} {pos:2} {driver:>15} (##) {timeLastLap:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector} {tyre:^4} | {gear} {speed} {DRS:^5}",
                 idx         = "ID",
                 pos         = "P",
                 driver      = "Driver",
@@ -641,7 +660,7 @@ fn main() {
             let car = &page.car[*idx];
 
             println!(
-                "{idx:02} {pos:02} {driver:>33} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:>3} {sector} {tyre:^5} | {gear:>4} {speed:>3} {DRS}",
+                "{idx:02} {pos:02} {driver} {timeLastLap:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector} {tyre:^4} | {gear:>4} {speed:>3} {DRS}",
                 driver      = car.driver.getDriver(),
                 timeLastLap = format!("{}", car.time.lastLap),
                 timeSector1 = format!("{}", car.time.sector1),
@@ -662,7 +681,7 @@ fn main() {
 
         // Bests
         println!(
-            "{idx:2} {pos:2} {driver:>24} {bestLapTime:>7} | {bestSector1:>7} {bestSector2:>7} {bestSector3:>7} | {bestPossible:>7}",
+            "{idx:2} {pos:2} {driver:>15}      {bestLapTime:>8} | {bestSector1:>8} {bestSector2:>8} {bestSector3:>8} | {bestPossible:>8}",
             idx         = "",
             pos         = "",
             driver      = "Bests",
