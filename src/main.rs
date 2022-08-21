@@ -215,14 +215,14 @@ struct Telemetry
 }
 
 #[derive(Debug, Default, Clone)]
-struct Time
+struct Times
 {
     // PacketLap.laps
-    pub sector1: Sector,                // sector1TimeInMS
-    pub sector2: Sector,                // sector2TimeInMS
-    pub sector3: Sector,                // sector2TimeInMS
-    pub lastLap: Lap,                   // lastLapTimeInMS
-    pub current: Lap,                   // currentLapTimeInMS
+    pub sector1: Time,                  // sector1TimeInMS
+    pub sector2: Time,                  // sector2TimeInMS
+    pub sector3: Time,                  // sector2TimeInMS
+    pub lastLap: Time,                  // lastLapTimeInMS
+    pub current: Time,                  // currentLapTimeInMS
 }
 
 #[derive(Debug, Default, Clone)]
@@ -234,7 +234,7 @@ struct Car
     pub assist: Assists,
     pub tyres: Tyres,
     pub telemetry: Telemetry,
-    pub time: Time,
+    pub time: Times,
 
     // PacketLap.laps
     pub spotGrid: u8,                   // gridPosition
@@ -251,26 +251,9 @@ struct SessionLap {
     pub total: u8,                      // PacketSession.totalLaps
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct Sector {
-    pub time: u16,                      // MIN of PacketLap.laps.{sector1TimeInMS,sector2TimeInMS} Calc of sector3TimeInMS
-    pub byId: u8,                       // Driver Index Number
-    pub onLap: u8,                      // PacketLap.laps.currentLapNum
-    pub isSet: bool,                    // Has this been set yet?
-    pub isOB: bool,                     // Is Overall Best?
-    pub isPB: bool,                     // Is Personal Best?
-}
-
-impl fmt::Display for Sector
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.3}", self.time as f32 / 1000 as f32)
-    }
-}
-
 #[derive(Debug, Default, Clone, Copy)]
-struct Lap {
-    pub time: u32,                      // MIN of PacketLap.laps.{lastLapTimeInMS}
+struct Time {
+    pub inMS: u32,                      // MIN of PacketLap.laps.{lastLapTimeInMS}
     pub byId: u8,                       // Driver Index Number
     pub onLap: u8,                      // PacketLap.laps.currentLapNum
     pub isSet: bool,                    // Has this been set yet?
@@ -278,22 +261,23 @@ struct Lap {
     pub isPB: bool,                     // Is Personal Best?
 }
 
-impl fmt::Display for Lap
+impl fmt::Display for Time
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.3}", self.time as f32 / 1000 as f32)
+        write!(f, "{:.3}", self.inMS as f32 / 1000 as f32)
     }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 struct Best {
-    pub sector1: Sector,
-    pub sector2: Sector,
-    pub sector3: Sector,
-    pub lapTime: Lap,
+    pub sector1: Time,
+    pub sector2: Time,
+    pub sector3: Time,
+    pub lapTime: Time,
     pub possible: u32,
 }
 
+#[derive(Debug)]
 enum Period
 {
     Sector1,
@@ -308,12 +292,13 @@ impl Best
     {
         match period {
             Period::Sector1 => {
-                if !self.sector1.isSet || self.sector1.time as u32 > time
+                if !self.sector1.isSet || self.sector1.inMS > time
                 {
-                    self.sector1.time = time as u16;
                     self.sector1.isSet = true;
+
                     self.sector1.byId = id;
                     self.sector1.onLap = lap;
+                    self.sector1.inMS = time;
                     self.update_possible();
                     true
                 }
@@ -323,12 +308,13 @@ impl Best
                 }
             },
             Period::Sector2 => {
-                if !self.sector1.isSet || self.sector2.time as u32 > time
+                if !self.sector2.isSet || self.sector2.inMS > time
                 {
-                    self.sector2.time = time as u16;
                     self.sector2.isSet = true;
+
                     self.sector2.byId = id;
                     self.sector2.onLap = lap;
+                    self.sector2.inMS = time;
                     self.update_possible();
                     true
                 }
@@ -338,12 +324,13 @@ impl Best
                 }
             },
             Period::Sector3 => {
-                if !self.sector3.isSet || self.sector3.time as u32 > time
+                if !self.sector3.isSet || self.sector3.inMS > time
                 {
-                    self.sector3.time = time as u16;
                     self.sector3.isSet = true;
+
                     self.sector3.byId = id;
                     self.sector3.onLap = lap;
+                    self.sector3.inMS = time;
                     self.update_possible();
                     true
                 }
@@ -353,13 +340,13 @@ impl Best
                 }
             },
             Period::LapTime => {
-                if !self.lapTime.isSet || self.lapTime.time > time
+                if !self.lapTime.isSet || self.lapTime.inMS > time
                 {
-                    self.lapTime.time = time;
                     self.lapTime.isSet = true;
+
                     self.lapTime.byId = id;
                     self.lapTime.onLap = lap;
-                    self.update_possible();
+                    self.lapTime.inMS = time;
                     true
                 }
                 else
@@ -374,7 +361,7 @@ impl Best
     {
         if self.sector1.isSet && self.sector2.isSet && self.sector3.isSet
         {
-            let newBestPossible: u32 = self.sector1.time as u32 + self.sector2.time as u32 + self.sector3.time as u32;
+            let newBestPossible: u32 = self.sector1.inMS as u32 + self.sector2.inMS as u32 + self.sector3.inMS as u32;
 
             if self.possible == 0 || self.possible > newBestPossible
             {
@@ -394,7 +381,6 @@ struct Page
     positions: [usize; 22],
     r#type: Session,                    // PacketSession.sessionType
     ob: Best,
-    pb: [Best; 22],
     car: [Car; 22],
     lap: SessionLap,
 }
@@ -538,6 +524,12 @@ fn main() {
                         continue;
                     }
 
+                    // Ignore Formation & First Lap
+                    if lap.currentLapNum == 1 && lap.lapDistance < 0.0
+                    {
+                        continue;
+                    }
+
                     // Update Leader Lap
                     if lap.currentLapNum > page.lap.leader
                     {
@@ -547,69 +539,52 @@ fn main() {
                     match lap.sector
                     {
                         0 => {
-                            // First time this car is in this sector on this lap.
-                            if car.lapNum != lap.currentLapNum
+                            // This is our first time in this sector.
+                            if lap.sector != car.sector
                             {
-                                // Sector 3 Time
-                                car.time.sector3.time = (
-                                    (
-                                        car.time.sector1.time as u32 +
-                                        car.time.sector2.time as u32
-                                    ) + lap.lastLapTimeInMS   as u32
-                                ) as u16;
+                                let sector3 = lap.lastLapTimeInMS - (car.time.sector1.inMS + car.time.sector2.inMS);
 
-                                page.ob     .sector3.isOB = page.ob     .isBest(Period::Sector3, car.time.sector3.time as u32, i, lap.currentLapNum);
-                                page.pb[idx].sector3.isPB = page.pb[idx].isBest(Period::Sector3, car.time.sector3.time as u32, i, lap.currentLapNum);
+                                car.time.sector3.inMS = sector3;
+                                car.time.sector3.isOB = page.ob.isBest(Period::Sector3,             sector3, i, car.lapNum);
 
-                                // Lap Time
-                                page.ob     .lapTime.isOB = page.ob     .isBest(Period::LapTime, lap.lastLapTimeInMS   as u32, i, lap.currentLapNum);
-                                page.pb[idx].lapTime.isPB = page.pb[idx].isBest(Period::LapTime, lap.lastLapTimeInMS   as u32, i, lap.currentLapNum);
-
+                                car.time.lastLap.inMS = lap.lastLapTimeInMS;
+                                car.time.lastLap.isOB = page.ob.isBest(Period::LapTime, lap.lastLapTimeInMS, i, car.lapNum);
                             }
 
-                            // Sector 1 Real Time
-                            car.time.sector1.time =  lap.currentLapTimeInMS as u16;
+                            // Real Time Sector Time
+                            car.time.sector1.inMS = lap.currentLapTimeInMS;
                         },
                         1 => {
-                            // First time this car is in this sector on this lap.
-                            if car.sector != lap.sector
+                            // This is our first time in this sector.
+                            if lap.sector != car.sector
                             {
-                                // Take the actual connocial time.
-                                car.time.sector1.time = lap.sector1TimeInMS;
-
-                                page.ob     .sector1.isOB = page.ob     .isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, lap.currentLapNum);
-                                page.pb[idx].sector1.isPB = page.pb[idx].isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, lap.currentLapNum);
+                                car.time.sector1.inMS = lap.sector1TimeInMS as u32;
+                                car.time.sector1.isOB = page.ob.isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, car.lapNum);
                             }
 
-                            // Sector 2 Real Time
-                            car.time.sector2.time = (lap.currentLapTimeInMS -  car.time.sector1.time as u32) as u16;
+                            // Real Time Sector Time
+                            car.time.sector2.inMS = lap.currentLapTimeInMS;
                         },
                         2 => {
-                            // First time this car is in this sector on this lap.
-                            if car.sector != lap.sector
+                            // This is our first time in this sector.
+                            if lap.sector != car.sector
                             {
-                                // Take the actual connocial time.
-                                car.time.sector2.time = lap.sector2TimeInMS;
-
-                                page.ob     .sector2.isOB = page.ob     .isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, lap.currentLapNum);
-                                page.pb[idx].sector2.isPB = page.pb[idx].isBest(Period::Sector2, lap.sector1TimeInMS as u32, i, lap.currentLapNum);
+                                car.time.sector1.inMS = lap.sector2TimeInMS as u32;
+                                car.time.sector2.isOB = page.ob.isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, car.lapNum);
                             }
 
-                            // Sector 3 Real Time
-                            car.time.sector3.time = (
-                                (
-                                    car.time.sector1.time as u32 +
-                                    car.time.sector2.time as u32
-                                ) + lap.currentLapTimeInMS
-                            ) as u16;
+                            // Real Time Sector Time
+                            car.time.sector3.inMS = lap.currentLapTimeInMS;
                         },
                         _ => unreachable!()
 
                     }
 
                     // Now update the remaining new informaiton.
-                    car.time.current.time = lap.currentLapTimeInMS;
-                    car.time.lastLap.time = lap.lastLapTimeInMS;
+                    car.time.sector1.inMS = lap.sector1TimeInMS as u32;
+                    car.time.sector2.inMS = lap.sector2TimeInMS as u32;
+                    car.time.current.inMS = lap.currentLapTimeInMS;
+                    car.time.lastLap.inMS = lap.lastLapTimeInMS;
 
                     car.spotGrid    = lap.gridPosition;
                     car.spotRace    = lap.carPosition;
@@ -701,6 +676,9 @@ fn main() {
 
         // Footer
         println!("");
+
+        // Debug
+        dbg!("{}", page.ob);
 
     }
 }
