@@ -563,7 +563,7 @@ fn main() {
                             }
 
                             // Real Time Sector Time
-                            car.time.sector2.inMS = lap.currentLapTimeInMS;
+                            car.time.sector2.inMS = lap.currentLapTimeInMS - car.time.sector1.inMS;
                         },
                         2 => {
                             // This is our first time in this sector.
@@ -574,7 +574,7 @@ fn main() {
                             }
 
                             // Real Time Sector Time
-                            car.time.sector3.inMS = lap.currentLapTimeInMS;
+                            car.time.sector3.inMS = lap.currentLapTimeInMS - (car.time.sector1.inMS + car.time.sector2.inMS);
                         },
                         _ => unreachable!()
 
@@ -610,7 +610,7 @@ fn main() {
 
         // Header
             println!(
-                "{idx:2} {pos:2} {driver:>19} (##) {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:>3} {tyre:^4} | {gear} {speed} {DRS:^5}",
+                "{idx:2} {pos:2} {driver:>19} (##) {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:>3} {sector} {tyre:^4} | {gear} {speed} {DRS:^5}",
                 idx         = "ID",
                 pos         = "P",
                 driver      = "Driver",
@@ -620,6 +620,7 @@ fn main() {
                 timeSector3 = "S3",
                 timeCurrent = "Time",
                 lap         = "Lap",
+                sector      = "S",
                 tyre        = "Tyre",
                 gear        = "Gear",
                 speed       = "KPH",
@@ -640,7 +641,7 @@ fn main() {
             let car = &page.car[*idx];
 
             println!(
-                "{idx:02} {pos:02} {driver:>33} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:>3} {tyre:^5} | {gear:>4} {speed:>3} {DRS}",
+                "{idx:02} {pos:02} {driver:>33} {timeLastLap:>7} | {timeSector1:>7} {timeSector2:>7} {timeSector3:>7} | {timeCurrent:>7} | {lap:>3} {sector} {tyre:^5} | {gear:>4} {speed:>3} {DRS}",
                 driver      = car.driver.getDriver(),
                 timeLastLap = format!("{}", car.time.lastLap),
                 timeSector1 = format!("{}", car.time.sector1),
@@ -648,6 +649,7 @@ fn main() {
                 timeSector3 = format!("{}", car.time.sector3),
                 timeCurrent = format!("{}", car.time.current),
                 lap         = car.lapNum,
+                sector      = car.sector,
                 tyre        = format!("{}", car.tyres),
                 gear        = format!("{}", car.telemetry.gear),
                 speed       = format!("{}", car.telemetry.speed),
@@ -660,7 +662,7 @@ fn main() {
 
         // Bests
         println!(
-            "{idx:2} {pos:2} {driver:>24} {bestLapTime:>7} | {bestSector1:>7} {bestSector2:>7} {bestSector3:>7} | {bestPossible:>7} | {lap:>3} {tyre:^5} {status:>6}",
+            "{idx:2} {pos:2} {driver:>24} {bestLapTime:>7} | {bestSector1:>7} {bestSector2:>7} {bestSector3:>7} | {bestPossible:>7}",
             idx         = "",
             pos         = "",
             driver      = "Bests",
@@ -668,10 +670,7 @@ fn main() {
             bestSector1 = format!("{}", page.ob.sector1),
             bestSector2 = format!("{}", page.ob.sector2),
             bestSector3 = format!("{}", page.ob.sector3),
-            bestPossible= format!("{}", page.ob.possible),
-            lap         = "",
-            tyre        = "",
-            status      = "",
+            bestPossible= format!("{:.3}", page.ob.possible as f32 / 1000 as f32),
         );
 
         // Footer
