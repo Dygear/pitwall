@@ -842,7 +842,7 @@ impl Lap
             lastLapTimeInMS            : u32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
             currentLapTimeInMS         : u32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
             sector1TimeInMS            : u16::from_le_bytes([bytes[ 8], bytes[ 9]]),
-            sector2TimeInMS            : u16::from_le_bytes([bytes[10], bytes[12]]),
+            sector2TimeInMS            : u16::from_le_bytes([bytes[10], bytes[11]]),
             lapDistance                : f32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
             totalDistance              : f32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]),
             safetyCarDelta             : f32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
@@ -860,8 +860,8 @@ impl Lap
             driverStatus               : CarState::from_u8(bytes[35]),
             resultStatus               : ResultStatus::from_u8(bytes[36]),
             pitLaneTimerActive         : bytes[37],
-            pitLaneTimeInLaneInMS      : u16::from_le_bytes([bytes[38], bytes[40]]),
-            pitStopTimerInMS           : u16::from_le_bytes([bytes[40], bytes[42]]),
+            pitLaneTimeInLaneInMS      : u16::from_le_bytes([bytes[38], bytes[39]]),
+            pitStopTimerInMS           : u16::from_le_bytes([bytes[40], bytes[41]]),
             pitStopShouldServePen      : bytes[42],
         }
     }
