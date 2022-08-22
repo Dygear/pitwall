@@ -390,9 +390,13 @@ impl fmt::Display for Time
             {
                 format!("{:>8}", time.green())
             }
+            else if self.isSet
+            {
+                format!("{:>8}", time.yellow())
+            }
             else
             {
-                time
+                format!("{:>8}", time)
             }
         )
     }
@@ -677,12 +681,38 @@ fn main() {
                                 let sector3 = lap.lastLapTimeInMS - (car.time.sector1.inMS + car.time.sector2.inMS);
 
                                 car.time.sector3.inMS = sector3;
-                                car.time.sector3.isOB =  page.ob.isBest(Period::Sector3,             sector3, i, car.lapNum);
-                                car.time.sector3.isPB = car.time.isBest(Period::Sector3,             sector3, i, car.lapNum);
+                                if page.ob.isBest(Period::Sector3, sector3, i, car.lapNum)
+                                {
+                                    car.time.sector3.isOB = true;
+                                    car.time.sector3.isPB = true;
+                                }
+                                else if car.time.isBest(Period::Sector3, sector3, i, car.lapNum)
+                                {
+                                    car.time.sector3.isOB = false;
+                                    car.time.sector3.isPB = true;
+                                }
+                                else
+                                {
+                                    car.time.sector3.isOB = false;
+                                    car.time.sector3.isPB = false;
+                                }
 
                                 car.time.lastLap.inMS = lap.lastLapTimeInMS;
-                                car.time.lastLap.isOB =  page.ob.isBest(Period::LapTime, lap.lastLapTimeInMS, i, car.lapNum);
-                                car.time.lastLap.isPB = car.time.isBest(Period::LapTime, lap.lastLapTimeInMS, i, car.lapNum);
+                                if page.ob.isBest(Period::LapTime, lap.lastLapTimeInMS, i, car.lapNum)
+                                {
+                                    car.time.lastLap.isOB = true;
+                                    car.time.lastLap.isPB = true;
+                                }
+                                else if car.time.isBest(Period::LapTime, lap.lastLapTimeInMS, i, car.lapNum)
+                                {
+                                    car.time.lastLap.isPB = false;
+                                    car.time.lastLap.isPB = true;
+                                }
+                                else
+                                {
+                                    car.time.lastLap.isPB = false;
+                                    car.time.lastLap.isPB = false;
+                                }
                             }
 
                             // Real Time Sector Time
@@ -693,8 +723,21 @@ fn main() {
                             if lap.sector != car.sector
                             {
                                 car.time.sector1.inMS = lap.sector1TimeInMS as u32;
-                                car.time.sector1.isOB =  page.ob.isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, car.lapNum);
-                                car.time.sector1.isPB = car.time.isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, car.lapNum);
+                                if page.ob.isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, car.lapNum)
+                                {
+                                    car.time.sector1.isOB = true;
+                                    car.time.sector1.isPB = true;
+                                }
+                                else if car.time.isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, car.lapNum)
+                                {
+                                    car.time.sector1.isOB = false;
+                                    car.time.sector1.isPB = true;
+                                }
+                                else
+                                {
+                                    car.time.sector1.isOB = false;
+                                    car.time.sector1.isPB = false;
+                                }
                             }
 
                             // Real Time Sector Time
@@ -705,8 +748,21 @@ fn main() {
                             if lap.sector != car.sector
                             {
                                 car.time.sector2.inMS = lap.sector2TimeInMS as u32;
-                                car.time.sector2.isOB =  page.ob.isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, car.lapNum);
-                                car.time.sector2.isPB = car.time.isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, car.lapNum);
+                                if page.ob.isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, car.lapNum)
+                                {
+                                    car.time.sector2.isOB = true;
+                                    car.time.sector2.isPB = true;
+                                }
+                                else if car.time.isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, car.lapNum)
+                                {
+                                    car.time.sector2.isOB = false;
+                                    car.time.sector2.isPB = true;
+                                }
+                                else
+                                {
+                                    car.time.sector2.isOB = false;
+                                    car.time.sector2.isPB = false;
+                                }
                             }
 
                             // Real Time Sector Time
@@ -809,9 +865,20 @@ fn main() {
 
         // Footer
         println!("");
+    }
+}
 
-        // Debug
-        dbg!("{}", page.ob);
-
+/// Clear the now stale OB bits.
+fn clearOBs(period: Period, mut car: &mut [Car; 22])
+{
+    for i in 0..22
+    {
+        match period
+        {
+            Period::Sector1 => car[i as usize].time.sector1.isOB = false,
+            Period::Sector2 => car[i as usize].time.sector2.isOB = false,
+            Period::Sector3 => car[i as usize].time.sector3.isOB = false,
+            Period::LapTime => car[i as usize].time.lastLap.isOB = false,
+        }
     }
 }
