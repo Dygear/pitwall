@@ -242,6 +242,12 @@ impl Times
 {
     fn isBest(&mut self, period: Period, time: u32, id: u8, lap: u8) -> bool
     {
+        // Formation Lap Fix.
+        if time == 0
+        {
+            return false;
+        }
+
         match period {
             Period::Sector1 => {
                 if !self.sector1.isSet || self.sector1.inMS > time
@@ -414,6 +420,12 @@ impl Best
 {
     fn isBest(&mut self, period: Period, time: u32, id: u8, lap: u8) -> bool
     {
+        // Formation Lap Fix.
+        if time == 0
+        {
+            return false;
+        }
+
         match period {
             Period::Sector1 => {
                 if !self.sector1.isSet || self.sector1.inMS > time
