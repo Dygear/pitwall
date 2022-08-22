@@ -50,30 +50,42 @@ impl Driver
             "{} ({:2})",
                format!("{:>15}", match self.underFlag {
                     ZoneFlag::Green => {
-                        if self.isAI {
+                        if self.isAI
+                        {
                             self.name.white().on_green()
-                        } else {
+                        }
+                        else
+                        {
                             self.name.yellow().on_green()
                         }
                     },
                     ZoneFlag::Blue => {
-                        if self.isAI {
+                        if self.isAI
+                        {
                             self.name.white().on_blue()
-                        } else {
+                        }
+                        else
+                        {
                             self.name.yellow().on_blue()
                         }
                     },
                     ZoneFlag::Yellow => {
-                        if self.isAI {
+                        if self.isAI
+                        {
                             self.name.white().on_yellow()
-                        } else {
+                        }
+                        else
+                        {
                             self.name.black().on_yellow()
                         }
                     },
                     _ => {
-                        if self.isAI {
+                        if self.isAI
+                        {
                             self.name.white()
-                        } else {
+                        }
+                        else
+                        {
                             self.name.yellow()
                         }
                     },
@@ -223,6 +235,90 @@ struct Times
     pub sector3: Time,                  // sector2TimeInMS
     pub lastLap: Time,                  // lastLapTimeInMS
     pub current: Time,                  // currentLapTimeInMS
+    pub possible: u32,
+}
+
+impl Times
+{
+    fn isBest(&mut self, period: Period, time: u32, id: u8, lap: u8) -> bool
+    {
+        match period {
+            Period::Sector1 => {
+                if !self.sector1.isSet || self.sector1.inMS > time
+                {
+                    self.sector1.isSet = true;
+                    self.sector1.byId = id;
+                    self.sector1.onLap = lap;
+                    self.sector1.inMS = time;
+                    self.update_possible();
+                    true
+                }
+                else
+                {
+                    false
+                }
+            },
+            Period::Sector2 => {
+                if !self.sector2.isSet || self.sector2.inMS > time
+                {
+                    self.sector2.isSet = true;
+                    self.sector2.byId = id;
+                    self.sector2.onLap = lap;
+                    self.sector2.inMS = time;
+                    self.update_possible();
+                    true
+                }
+                else
+                {
+                    false
+                }
+            },
+            Period::Sector3 => {
+                if !self.sector3.isSet || self.sector3.inMS > time
+                {
+                    self.sector3.isSet = true;
+                    self.sector3.byId = id;
+                    self.sector3.onLap = lap;
+                    self.sector3.inMS = time;
+                    self.update_possible();
+                    true
+                }
+                else
+                {
+                    false
+                }
+            },
+            Period::LapTime => {
+                if !self.lastLap.isSet || self.lastLap.inMS > time
+                {
+                    self.lastLap.isSet = true;
+                    self.lastLap.byId = id;
+                    self.lastLap.onLap = lap;
+                    self.lastLap.inMS = time;
+                    true
+                }
+                else
+                {
+                    false
+                }
+            },
+        }
+    }
+
+    fn update_possible(&mut self) -> bool
+    {
+        if self.sector1.isSet && self.sector2.isSet && self.sector3.isSet
+        {
+            let newBestPossible: u32 = self.sector1.inMS as u32 + self.sector2.inMS as u32 + self.sector3.inMS as u32;
+
+            if self.possible == 0 || self.possible > newBestPossible
+            {
+                self.possible = newBestPossible;
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -271,18 +367,25 @@ impl fmt::Display for Time
             let seconds =(self.inMS -(60000 * minutes)) / 1000;
             let milisec = self.inMS % 1000;
             format!("{}:{:02}.{:03}", minutes, seconds, milisec)
-        } else {
+        }
+        else
+        {
             format!("{:.3}", self.inMS as f32 / 1000 as f32)
         };
 
         write!(
             f,
             "{}",
-            if self.isOB {
+            if self.isOB
+            {
                 format!("{:>8}", time.purple())
-            } else if self.isPB {
+            }
+            else if self.isPB
+            {
                 format!("{:>8}", time.green())
-            } else {
+            }
+            else
+            {
                 time
             }
         )
@@ -309,14 +412,13 @@ enum Period
 
 impl Best
 {
-    pub fn isBest(&mut self, period: Period, time: u32, id: u8, lap: u8) -> bool
+    fn isBest(&mut self, period: Period, time: u32, id: u8, lap: u8) -> bool
     {
         match period {
             Period::Sector1 => {
                 if !self.sector1.isSet || self.sector1.inMS > time
                 {
                     self.sector1.isSet = true;
-
                     self.sector1.byId = id;
                     self.sector1.onLap = lap;
                     self.sector1.inMS = time;
@@ -332,7 +434,6 @@ impl Best
                 if !self.sector2.isSet || self.sector2.inMS > time
                 {
                     self.sector2.isSet = true;
-
                     self.sector2.byId = id;
                     self.sector2.onLap = lap;
                     self.sector2.inMS = time;
@@ -348,7 +449,6 @@ impl Best
                 if !self.sector3.isSet || self.sector3.inMS > time
                 {
                     self.sector3.isSet = true;
-
                     self.sector3.byId = id;
                     self.sector3.onLap = lap;
                     self.sector3.inMS = time;
@@ -364,7 +464,6 @@ impl Best
                 if !self.lapTime.isSet || self.lapTime.inMS > time
                 {
                     self.lapTime.isSet = true;
-
                     self.lapTime.byId = id;
                     self.lapTime.onLap = lap;
                     self.lapTime.inMS = time;
@@ -378,7 +477,7 @@ impl Best
         }
     }
 
-    pub fn update_possible(&mut self) -> bool
+    fn update_possible(&mut self) -> bool
     {
         if self.sector1.isSet && self.sector2.isSet && self.sector3.isSet
         {
@@ -566,10 +665,12 @@ fn main() {
                                 let sector3 = lap.lastLapTimeInMS - (car.time.sector1.inMS + car.time.sector2.inMS);
 
                                 car.time.sector3.inMS = sector3;
-                                car.time.sector3.isOB = page.ob.isBest(Period::Sector3,             sector3, i, car.lapNum);
+                                car.time.sector3.isOB =  page.ob.isBest(Period::Sector3,             sector3, i, car.lapNum);
+                                car.time.sector3.isPB = car.time.isBest(Period::Sector3,             sector3, i, car.lapNum);
 
                                 car.time.lastLap.inMS = lap.lastLapTimeInMS;
-                                car.time.lastLap.isOB = page.ob.isBest(Period::LapTime, lap.lastLapTimeInMS, i, car.lapNum);
+                                car.time.lastLap.isOB =  page.ob.isBest(Period::LapTime, lap.lastLapTimeInMS, i, car.lapNum);
+                                car.time.lastLap.isPB = car.time.isBest(Period::LapTime, lap.lastLapTimeInMS, i, car.lapNum);
                             }
 
                             // Real Time Sector Time
@@ -580,7 +681,8 @@ fn main() {
                             if lap.sector != car.sector
                             {
                                 car.time.sector1.inMS = lap.sector1TimeInMS as u32;
-                                car.time.sector1.isOB = page.ob.isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, car.lapNum);
+                                car.time.sector1.isOB =  page.ob.isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, car.lapNum);
+                                car.time.sector1.isPB = car.time.isBest(Period::Sector1, lap.sector1TimeInMS as u32, i, car.lapNum);
                             }
 
                             // Real Time Sector Time
@@ -591,7 +693,8 @@ fn main() {
                             if lap.sector != car.sector
                             {
                                 car.time.sector2.inMS = lap.sector2TimeInMS as u32;
-                                car.time.sector2.isOB = page.ob.isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, car.lapNum);
+                                car.time.sector2.isOB =  page.ob.isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, car.lapNum);
+                                car.time.sector2.isPB = car.time.isBest(Period::Sector2, lap.sector2TimeInMS as u32, i, car.lapNum);
                             }
 
                             // Real Time Sector Time
