@@ -1835,8 +1835,7 @@ impl RevLights
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
-        Self
-        {
+        Self {
             LEDs: ((bytes[1] as u16) << 8) + bytes[0] as u16
         }
     }
@@ -2003,8 +2002,7 @@ impl PacketCarTelemetry
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
-        Self
-        {
+        Self {
             header            : Header::unpack(&bytes),
 
             carTelemetry      : Self::carTelemetry(&bytes[24..1344]),
@@ -2195,7 +2193,8 @@ impl VisualCompound {
 }
 
 impl fmt::Display for VisualCompound {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
         match self
         {
             VisualCompound::OldHard      => write!(f, "H"),
@@ -2314,8 +2313,7 @@ impl PacketCarStatus
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
-        Self
-        {
+        Self {
             header: Header::unpack(&bytes),
 
             carStatus: Self::carStatus(&bytes[24..]),
@@ -2370,8 +2368,7 @@ impl FinalClassification
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
-        Self
-        {
+        Self {
                      position:                       bytes[ 0],
                       numLaps:                       bytes[ 1],
                  gridPosition:                       bytes[ 2],
@@ -2427,8 +2424,7 @@ impl PacketFinalClassification
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
-        Self
-        {
+        Self {
             header: Header::unpack(&bytes),
 
             numCars: bytes[25],
@@ -2629,8 +2625,7 @@ impl CarDamage
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
-        Self
-        {
+        Self {
                        tyresWear: Wheels::unpack(&bytes[0..16]),
                      tyresDamage: [bytes[16], bytes[17], bytes[18], bytes[19]],
                     brakesDamage: [bytes[20], bytes[21], bytes[22], bytes[23]],
@@ -2669,8 +2664,7 @@ impl PacketCarDamage
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
-        Self
-        {
+        Self {
             header: Header::unpack(&bytes),
 
             carDamageData: Self::carDamage(&bytes[23..])
