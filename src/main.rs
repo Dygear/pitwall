@@ -47,51 +47,50 @@ impl Driver
     pub fn getDriver(&self) -> String
     {
         format!(
-            "{} ({:2})",
-               format!("{:>15}", match self.underFlag {
-                    ZoneFlag::Green => {
-                        if self.isAI
-                        {
-                            self.name.white().on_green()
-                        }
-                        else
-                        {
-                            self.name.yellow().on_green()
-                        }
-                    },
-                    ZoneFlag::Blue => {
-                        if self.isAI
-                        {
-                            self.name.white().on_blue()
-                        }
-                        else
-                        {
-                            self.name.yellow().on_blue()
-                        }
-                    },
-                    ZoneFlag::Yellow => {
-                        if self.isAI
-                        {
-                            self.name.white().on_yellow()
-                        }
-                        else
-                        {
-                            self.name.black().on_yellow()
-                        }
-                    },
-                    _ => {
-                        if self.isAI
-                        {
-                            self.name.white()
-                        }
-                        else
-                        {
-                            self.name.yellow()
-                        }
-                    },
-                }
-            ),
-            self.number,
+            "{:>15} ({:2})",
+            match self.underFlag {
+                ZoneFlag::Green => {
+                    if self.isAI
+                    {
+                        self.name.white().on_green()
+                    }
+                    else
+                    {
+                        self.name.yellow().on_green()
+                    }
+                },
+                ZoneFlag::Blue => {
+                    if self.isAI
+                    {
+                        self.name.white().on_blue()
+                    }
+                    else
+                    {
+                        self.name.yellow().on_blue()
+                    }
+                },
+                ZoneFlag::Yellow => {
+                    if self.isAI
+                    {
+                        self.name.white().on_yellow()
+                    }
+                    else
+                    {
+                        self.name.black().on_yellow()
+                    }
+                },
+                _ => {
+                    if self.isAI
+                    {
+                        self.name.white()
+                    }
+                    else
+                    {
+                        self.name.yellow()
+                    }
+                },
+            },
+            self.number
         )
     }
 }
@@ -105,7 +104,7 @@ struct Team
 }
 
 #[derive(Debug, Default, Clone)]
-struct DRS
+struct Drs
 {
     // PacketCarTelemetry.carTelemetryData
     pub isOpen: bool,                   // drs
@@ -113,7 +112,7 @@ struct DRS
     pub isAllowed: bool,                // drsAllowed
 }
 
-impl fmt::Display for DRS
+impl fmt::Display for Drs
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
@@ -127,7 +126,7 @@ impl fmt::Display for DRS
         }
         else
         {
-            write!(f, "[{}]", "DRS")
+            write!(f, "[DRS]")
         }
     }
 }
@@ -156,58 +155,22 @@ impl fmt::Display for Tyres
         match self.visual
         {
             VisualCompound::OldHard     | VisualCompound::Hard   => {
-                write!(
-                    f,
-                    "{}{}{}", 
-                    format!("{}", "(".white()),
-                    format!("{}", self.visual),
-                    format!("{}", ")".white()),
-                )
+                write!(f, "{}{}{}", "(".white()  , self.visual, ")".white())
             },
             VisualCompound::OldMedium   | VisualCompound::Medium => {
-                write!(
-                    f,
-                    "{}{}{}",
-                    format!("{}", "(".yellow()),
-                    format!("{}", self.visual),
-                    format!("{}", ")".yellow()),
-                )
+                write!(f, "{}{}{}", "(".yellow() , self.visual, ")".yellow())
             },
             VisualCompound::OldSoft     | VisualCompound::Soft   => {
-                write!(
-                    f,
-                    "{}{}{}",
-                    format!("{}", "(".red()),
-                    format!("{}", self.visual),
-                    format!("{}", ")".red()),
-                )
+                write!(f, "{}{}{}", "(".red()    , self.visual, ")".red())
             },
             VisualCompound::OldSuperSoft                         => {
-                write!(
-                    f,
-                    "{}{}{}",
-                    format!("{}", "(".magenta()),
-                    format!("{}", self.visual),
-                    format!("{}", ")".magenta()),
-                )
+                write!(f, "{}{}{}", "(".magenta(), self.visual, ")".magenta())
             },
             VisualCompound::Inter                                => {
-                write!(
-                    f,
-                    "{}{}{}",
-                    format!("{}", "(".green()),
-                    format!("{}", self.visual),
-                    format!("{}", ")".green())
-                )
+                write!(f, "{}{}{}", "(".green()  , self.visual, ")".green())
             },
             VisualCompound::OldWet      | VisualCompound::Wet    => {
-                write!(
-                    f,
-                    "{}{}{}",
-                    format!("{}", "(".blue()),
-                    format!("{}", self.visual),
-                    format!("{}", ")".blue()),
-                )
+                write!(f, "{}{}{}", "(".blue()   , self.visual, ")".blue())
             },
                                                                _ => {
                 write!(f, "{}", self.actual)
@@ -220,7 +183,7 @@ impl fmt::Display for Tyres
 struct Telemetry
 {
     // PacketCarTelemetry.carTelemetryData
-    pub speed: KPH,                     // speed
+    pub speed: Kph,                     // speed
     pub gear: Gear,                     // gear
     pub rpm: u16,                       // engineRPM
     pub leds: RevLights,                // revLightsBitValue
@@ -323,7 +286,8 @@ impl Times
                 return true;
             }
         }
-        return false;
+
+        false
     }
 }
 
@@ -332,7 +296,7 @@ struct Car
 {
     pub driver: Driver,
     pub team: Team,
-    pub DRS: DRS,
+    pub Drs: Drs,
     pub assist: Assists,
     pub tyres: Tyres,
     pub telemetry: Telemetry,
@@ -376,7 +340,7 @@ impl fmt::Display for Time
         }
         else
         {
-            format!("{:.3}", self.inMS as f32 / 1000 as f32)
+            format!("{:.3}", self.inMS as f32 / 1000_f32)
         };
 
         write!(
@@ -505,7 +469,8 @@ impl Best
                 return true;
             }
         }
-        return false;
+
+        false
     }
 }
 
@@ -525,8 +490,10 @@ fn main() {
     let socket = UdpSocket::bind("0.0.0.0:20777").expect("Couldn't bind to address.");
     println!("UDP Port Bound");
 
-    let mut page = Page::default();
-    page.positions = [usize::MAX; 22];
+    let mut page = Page {
+        positions: [usize::MAX; 22],
+        ..Page::default()
+    };
 
     let mut buffer = [0; 1500];
     loop
@@ -621,7 +588,7 @@ fn main() {
                 {
                     let idx = i as usize;
 
-                    page.car[idx].DRS.isOpen                = t.carTelemetry[idx].drs == 1;
+                    page.car[idx].Drs.isOpen                = t.carTelemetry[idx].drs == 1;
                     page.car[idx].telemetry.speed           = t.carTelemetry[idx].speed;
                     page.car[idx].telemetry.gear            = t.carTelemetry[idx].gear;
                     page.car[idx].telemetry.rpm             = t.carTelemetry[idx].engineRPM;
@@ -634,7 +601,7 @@ fn main() {
                 {
                     let idx = i as usize;
 
-                    page.car[idx].DRS.isAllowed             = s.carStatus[idx].drsAllowed == 1;
+                    page.car[idx].Drs.isAllowed             = s.carStatus[idx].drsAllowed == 1;
                     page.car[idx].assist.TC                 = s.carStatus[idx].tractionControl;
                     page.car[idx].assist.ABS                = s.carStatus[idx].antiLockBrakes;
                     page.car[idx].tyres.actual              = s.carStatus[idx].actualTyre;
@@ -800,7 +767,7 @@ fn main() {
 
         // Header
             println!(
-                "{idx:2} {pos:2} {driver:>15} (##) {timeLastLap:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector} {tyre:^4} | {gear} {speed} {DRS:^5}",
+                "{idx:2} {pos:2} {driver:>15} (##) {timeLastLap:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1} {tyre:>4} | {gear:>1} {DRS:^5} {speed:>3}",
                 idx         = "ID",
                 pos         = "P",
                 driver      = "Driver",
@@ -812,9 +779,9 @@ fn main() {
                 lap         = "Lap",
                 sector      = "S",
                 tyre        = "Tyre",
-                gear        = "Gear",
+                gear        = "G",
+                DRS         = "DRS",
                 speed       = "KPH",
-                DRS         = "DRS"
             );
 
         // Cars
@@ -831,54 +798,39 @@ fn main() {
             let car = &page.car[*idx];
 
             println!(
-                "{idx:02} {pos:02} {driver} {timeLastLap:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector} {tyre:^4} | {gear:>4} {speed:>3} {DRS}",
+                "{idx:02} {pos:02} {driver} {timeLastLap:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1}  {tyre:>4} | {gear:>1} {DRS} {speed:>3}",
                 driver      = car.driver.getDriver(),
-                timeLastLap = format!("{}", car.time.lastLap),
-                timeSector1 = format!("{}", car.time.sector1),
-                timeSector2 = format!("{}", car.time.sector2),
-                timeSector3 = format!("{}", car.time.sector3),
-                timeCurrent = format!("{}", car.time.current),
+                timeLastLap = car.time.lastLap,
+                timeSector1 = car.time.sector1,
+                timeSector2 = car.time.sector2,
+                timeSector3 = car.time.sector3,
+                timeCurrent = car.time.current,
                 lap         = car.lapNum,
                 sector      = car.sector,
-                tyre        = format!("{}", car.tyres),
-                gear        = format!("{}", car.telemetry.gear),
-                speed       = format!("{}", car.telemetry.speed),
-                DRS         = car.DRS
+                tyre        = car.tyres,
+                gear        = car.telemetry.gear,
+                DRS         = car.Drs,
+                speed       = car.telemetry.speed,
             );
         }
 
         // Footer
-        println!("");
+        println!();
 
         // Bests
         println!(
-            "{idx:2} {pos:2} {driver:>15}      {bestLapTime:>8} | {bestSector1:>8} {bestSector2:>8} {bestSector3:>8} | {bestPossible:>8}",
+            "{idx:2} {pos:2} {driver:>15}      {bestLapTime:>8} | {bestSector1:>8} {bestSector2:>8} {bestSector3:>8} | {bestPossible:>8.3}",
             idx         = "",
             pos         = "",
             driver      = "Bests",
-            bestLapTime = format!("{}", page.ob.lapTime),
-            bestSector1 = format!("{}", page.ob.sector1),
-            bestSector2 = format!("{}", page.ob.sector2),
-            bestSector3 = format!("{}", page.ob.sector3),
-            bestPossible= format!("{:.3}", page.ob.possible as f32 / 1000 as f32),
+            bestLapTime = page.ob.lapTime,
+            bestSector1 = page.ob.sector1,
+            bestSector2 = page.ob.sector2,
+            bestSector3 = page.ob.sector3,
+            bestPossible= page.ob.possible as f32 / 1000_f32,
         );
 
         // Footer
-        println!("");
-    }
-}
-
-/// Clear the now stale OB bits.
-fn clearOBs(period: Period, mut car: &mut [Car; 22])
-{
-    for i in 0..22
-    {
-        match period
-        {
-            Period::Sector1 => car[i as usize].time.sector1.isOB = false,
-            Period::Sector2 => car[i as usize].time.sector2.isOB = false,
-            Period::Sector3 => car[i as usize].time.sector3.isOB = false,
-            Period::LapTime => car[i as usize].time.lastLap.isOB = false,
-        }
+        println!();
     }
 }

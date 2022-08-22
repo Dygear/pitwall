@@ -253,7 +253,7 @@ impl PacketMotion
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header: Header::unpack(&bytes),
+            header: Header::unpack(bytes),
 
             carMotion: Self::carMotion(&bytes[size_of::<Header>()..size_of::<Header>()+(size_of::<CarMotion>()*22)]),
 
@@ -275,12 +275,12 @@ impl PacketMotion
         let mut cm = [CarMotion::default(); 22];
         let size = size_of::<CarMotion>();
 
-        for i in 0..22
+        for (i, cm) in cm.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            cm[i] = CarMotion::unpack(&bytes[s..e]);
+            *cm = CarMotion::unpack(&bytes[s..e]);
         }
 
         cm
@@ -530,7 +530,7 @@ impl PacketSession
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header                : Header::unpack(&bytes),
+            header                : Header::unpack(bytes),
 
             weather               : Weather::from_u8(&bytes[25]),
             trackTemperature      : bytes[26] as i8,
@@ -583,12 +583,12 @@ impl PacketSession
 
         let size = size_of::<MarshalZone>();
 
-        for i in 0..21
+        for (i, mz) in mz.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            mz[i] = MarshalZone::unpack(&bytes[s..e]);
+            *mz = MarshalZone::unpack(&bytes[s..e]);
         }
 
         mz
@@ -600,12 +600,12 @@ impl PacketSession
 
         let size = size_of::<WeatherForecast>();
 
-        for i in 0..56
+        for (i, wf) in wf.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            wf[i] = WeatherForecast::unpack(&bytes[s..e]);
+            *wf = WeatherForecast::unpack(&bytes[s..e]);
         }
 
         wf
@@ -982,7 +982,7 @@ impl PacketLap
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header: Header::unpack(&bytes),
+            header: Header::unpack(bytes),
 
             laps: Self::lap(&bytes[24..24+43*22]),
 
@@ -997,12 +997,12 @@ impl PacketLap
 
         let size = 43;
 
-        for i in 0..22
+        for (i, l) in l.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            l[i] = Lap::unpack(&bytes[s..e]);
+            *l = Lap::unpack(&bytes[s..e]);
         }
 
         l
@@ -1340,7 +1340,7 @@ impl EventTag
         }
     }
 
-    pub fn to_str(&self) -> &str
+    pub fn to_str(self) -> &'static str
     {
         match &self.tag
         {
@@ -1395,7 +1395,7 @@ impl PacketEvent
         let eventTag: EventTag = EventTag::unpack(&bytes[24..28]);
 
         Self {
-            header: Header::unpack(&bytes),
+            header: Header::unpack(bytes),
 
             eventStringCode: eventTag,
             eventDetails: match &eventTag.tag {
@@ -1582,7 +1582,7 @@ impl PacketParticipants
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header: Header::unpack(&bytes),
+            header: Header::unpack(bytes),
 
             numActiveCars: bytes[25],
             participants: Self::participants(&bytes[25..]),
@@ -1594,12 +1594,12 @@ impl PacketParticipants
         let mut p = [Participant::default(); 22];
         let size = size_of::<Participant>();
 
-        for i in 0..22
+        for (i, p) in p.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            p[i] = Participant::unpack(&bytes[s..e]);
+            *p = Participant::unpack(&bytes[s..e]);
         }
 
         p
@@ -1680,7 +1680,7 @@ impl PacketCarSetups
     {
         Self
         {
-            header: Header::unpack(&bytes),
+            header: Header::unpack(bytes),
 
             carSetups: Self::carSetups(&bytes[size_of::<Header>()..])
         }
@@ -1691,12 +1691,12 @@ impl PacketCarSetups
         let mut cs = [CarSetup::default(); 22];
         let size = size_of::<CarSetup>();
 
-        for i in 0..22
+        for (i, cs) in cs.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            cs[i] = CarSetup::unpack(&bytes[s..e]);
+            *cs = CarSetup::unpack(&bytes[s..e]);
         }
 
         cs
@@ -1713,11 +1713,11 @@ impl PacketCarSetups
 
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy)]
-pub struct KPH {
+pub struct Kph {
     kph: u16
 }
 
-impl KPH {
+impl Kph {
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self
@@ -1727,7 +1727,7 @@ impl KPH {
     }
     pub fn toMPH(&self) -> f32
     {
-        self.kph as f32 * 0.6213711922373837
+        self.kph as f32 * 0.621_371_2
     }
     pub fn toMPHString(&self) -> String
     {
@@ -1735,7 +1735,7 @@ impl KPH {
     }
 }
 
-impl fmt::Display for KPH
+impl fmt::Display for Kph
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kph)
@@ -1901,7 +1901,7 @@ impl fmt::Debug for RevLights
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarTelemetry
 {
-    pub speed: KPH,                         // Speed of car in kilometres per hour
+    pub speed: Kph,                         // Speed of car in kilometres per hour
     pub throttle: f32,                      // Amount of throttle applied (0.0 to 1.0)
     pub steer: f32,                         // Steering (-1.0 (full lock left) to 1.0 (full lock right))
     pub brake: f32,                         // Amount of brake applied (0.0 to 1.0)
@@ -1924,7 +1924,7 @@ impl CarTelemetry
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            speed                  : KPH::unpack(&bytes[ 0.. 2]),
+            speed                  : Kph::unpack(&bytes[ 0.. 2]),
             throttle               : f32::from_le_bytes([bytes[ 2], bytes[ 3], bytes[ 4], bytes[ 5]]),
             steer                  : f32::from_le_bytes([bytes[ 6], bytes[ 7], bytes[ 8], bytes[ 9]]),
             brake                  : f32::from_le_bytes([bytes[10], bytes[11], bytes[12], bytes[13]]),
@@ -2003,7 +2003,7 @@ impl PacketCarTelemetry
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header            : Header::unpack(&bytes),
+            header            : Header::unpack(bytes),
 
             carTelemetry      : Self::carTelemetry(&bytes[24..1344]),
 
@@ -2018,12 +2018,12 @@ impl PacketCarTelemetry
         let mut ct = [CarTelemetry::default(); 22];
         let size = size_of::<CarTelemetry>();
 
-        for i in 0..22
+        for (i, ct) in ct.iter_mut().enumerate()
         {
             let s = size * i;
             let e = s + size;
 
-            ct[i] = CarTelemetry::unpack(&bytes[s..e]);
+            *ct = CarTelemetry::unpack(&bytes[s..e]);
         }
 
         ct
@@ -2314,7 +2314,7 @@ impl PacketCarStatus
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header: Header::unpack(&bytes),
+            header: Header::unpack(bytes),
 
             carStatus: Self::carStatus(&bytes[24..]),
         }
@@ -2325,12 +2325,12 @@ impl PacketCarStatus
         let mut cs = [CarStatus::default(); 22];
         let size = size_of::<CarStatus>();
 
-        for i in 0..22
+        for (i, cs) in cs.iter_mut().enumerate()
         {
             let s = size * i;
             let e = s + size;
 
-            cs[i] = CarStatus::unpack(&bytes[s..e]);
+            *cs = CarStatus::unpack(&bytes[s..e]);
         }
 
         cs
@@ -2390,9 +2390,9 @@ impl FinalClassification
     {
         let mut ac = [ActualCompound::default(); 8];
 
-        for i in 0..8
+        for (i, ac) in ac.iter_mut().enumerate()
         {
-            ac[i] = ActualCompound::from_u8(&bytes[i])
+            *ac = ActualCompound::from_u8(&bytes[i])
         }
 
         ac
@@ -2401,9 +2401,9 @@ impl FinalClassification
     {
         let mut vc = [VisualCompound::default(); 8];
 
-        for i in 0..8
+        for (i, vc) in vc.iter_mut().enumerate()
         {
-            vc[i] = VisualCompound::from_u8(&bytes[i])
+            *vc = VisualCompound::from_u8(&bytes[i])
         }
 
         vc
@@ -2425,7 +2425,7 @@ impl PacketFinalClassification
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header: Header::unpack(&bytes),
+            header: Header::unpack(bytes),
 
             numCars: bytes[25],
             classificationData: Self::classificationData(&bytes[26..])
@@ -2437,12 +2437,12 @@ impl PacketFinalClassification
         let mut fc = [FinalClassification::default(); 22];
         let size = size_of::<FinalClassification>();
 
-        for i in 0..22
+        for (i, fc) in fc.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            fc[i] = FinalClassification::unpack(&bytes[s..e]);
+            *fc = FinalClassification::unpack(&bytes[s..e]);
         }
 
         fc
@@ -2563,7 +2563,7 @@ impl PacketLobbyInfo
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header: Header::unpack(&bytes),
+            header: Header::unpack(bytes),
 
             numPlayers: bytes[24],
             lobbyPlayers: Self::lobbyInfo(&bytes[25..]),
@@ -2575,12 +2575,12 @@ impl PacketLobbyInfo
         let mut li = [LobbyInfo::default(); 22];
         let size = size_of::<LobbyInfo>();
 
-        for i in 0..22
+        for (i, li) in li.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            li[i] = LobbyInfo::unpack(&bytes[s..e]);
+            *li = LobbyInfo::unpack(&bytes[s..e]);
         }
 
         li
@@ -2665,7 +2665,7 @@ impl PacketCarDamage
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header: Header::unpack(&bytes),
+            header: Header::unpack(bytes),
 
             carDamageData: Self::carDamage(&bytes[23..])
         }
@@ -2676,12 +2676,12 @@ impl PacketCarDamage
         let mut cd = [CarDamage::default(); 22];
         let size = size_of::<CarDamage>();
 
-        for i in 0..22
+        for (i, cd) in cd.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            cd[i] = CarDamage::unpack(&bytes[s..e]);
+            *cd = CarDamage::unpack(&bytes[s..e]);
         }
 
         cd
@@ -2802,7 +2802,8 @@ impl PacketSessionHistory
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header           : Header::unpack(&bytes),
+            header           : Header::unpack(bytes),
+
             carIdx           : bytes[24],
             numLaps          : bytes[25],
             numTyreStints    : bytes[26],
@@ -2820,12 +2821,12 @@ impl PacketSessionHistory
         let mut lh = [LapHistory::default(); 100];
         let size = 11;
 
-        for i in 0..100
+        for (i, lh) in lh.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            lh[i] = LapHistory::unpack(&bytes[s..e]);
+            *lh = LapHistory::unpack(&bytes[s..e]);
         }
 
         lh
@@ -2836,12 +2837,12 @@ impl PacketSessionHistory
         let mut tsh = [TyreStintHistory::default(); 8];
         let size = 3;
 
-        for i in 0..8
+        for (i, tsh) in tsh.iter_mut().enumerate()
         {
             let s = i * size;
             let e = s + size;
 
-            tsh[i] = TyreStintHistory::unpack(&bytes[s..e]);
+            *tsh = TyreStintHistory::unpack(&bytes[s..e]);
         }
 
         tsh
