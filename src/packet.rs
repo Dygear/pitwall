@@ -5,6 +5,7 @@ use std::mem::size_of;
 use std::fmt;
 
 // https://answers.ea.com/t5/General-Discussion/F1-22-UDP-Specification/td-p/11551274
+// https://forums.ea.com/blog/f1-games-game-info-hub-en/ea-sports%e2%84%a2-f1%c2%ae25-udp-specification/12187347
 
 /**
  * # Packet Header
