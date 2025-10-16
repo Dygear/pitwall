@@ -566,6 +566,10 @@ fn main() {
                     let pcs = &mut page.car[idx];
                     let pos = car.racePosition as usize;
 
+                    if pos == 0 {
+                        continue;
+                    }
+
                     // Update car positions.
                     page.positions[pos] = idx;
 
@@ -598,7 +602,7 @@ fn main() {
                                 pcs.time.sector1.isPB = false;
 
                                 // Calculate Sector 3's Split Time.
-                                let sector3 = car.lastLapTimeInMS - (pcs.time.sector2.inMS + pcs.time.sector2.inMS);
+                                let sector3 = car.lastLapTimeInMS - (pcs.time.sector1.inMS + pcs.time.sector2.inMS);
                                 pcs.time.sector3.inMS = sector3;
 
                                 // Check to see if it's a Personal and / or Overall Best.
