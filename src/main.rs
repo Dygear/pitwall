@@ -401,7 +401,7 @@ struct Page {
     participants: u8,   // PacketParticipants.numActiveCars
     playerCarIndex: u8, // Always the last item, and so gives you the bounds of the array.
     positions: [usize; 23],
-    r#type: Session, // PacketSession.sessionType
+    session: Session, // PacketSession.sessionType
     ob: Best,
     car: [Car; 23],
     lap: SessionLap,
@@ -516,7 +516,7 @@ fn main() {
             Packet::Session(s) => {
                 page.playerCarIndex = s.header.playerCarIndex;
                 page.lap.total = s.totalLaps;
-                page.r#type = s.sessionType;
+                page.session = s.sessionType;
             }
             Packet::Participants(p) => {
                 page.participants = p.numActiveCars;
@@ -574,7 +574,7 @@ fn main() {
                     page.positions[pos] = idx;
 
                     // Ignore Formation & First Lap
-                    if car.currentLapNum == 1 && car.lapDistance < 0.0 {
+                    if car.lapDistance < 0.0 {
                         continue;
                     }
 
@@ -600,6 +600,8 @@ fn main() {
                                 // Clear any stats from the previous lap.
                                 pcs.time.sector1.isOB = false;
                                 pcs.time.sector1.isPB = false;
+                                pcs.time.lastLap.isOB = false;
+                                pcs.time.lastLap.isPB = false;
 
                                 // Calculate Sector 3's Split Time.
                                 let sector3 = car.lastLapTimeInMS - (pcs.time.sector1.inMS + pcs.time.sector2.inMS);
@@ -748,15 +750,15 @@ fn main() {
         print!("{ESC}c");
 
         println!(
-            "Lap: {lapLeader:02} {lapTotal:02} ({playerCarIndex:02})",
+            "{session:>5} {lapLeader:02} {lapTotal:02}",
+            session   = page.session,
             lapLeader = page.lap.leader,
-            lapTotal = page.lap.total,
-            playerCarIndex = page.playerCarIndex
+            lapTotal  = page.lap.total,
         );
 
         // Header
         println!(
-                "{idx:2} {pos:2} {driver:>15} (##) {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1} {tyre:>4} | {gear:>1} {DRS:^5} {speed:>3}",
+                "{idx:2} {pos:2} {driver:>15} (##) {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1} {tyre:>4} | {gear:>1} {DRS:^5} {speed:>3} | {state:^5}",
                 idx         = "ID",
                 pos         = "P",
                 driver      = "Driver",
@@ -773,6 +775,7 @@ fn main() {
                 gear        = "G",
                 DRS         = "DRS",
                 speed       = "KPH",
+                state       = "State"
             );
 
         // Cars
@@ -788,7 +791,7 @@ fn main() {
             let car = &page.car[*idx];
 
             println!(
-                "{idx:02} {pos:02} {driver} {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1}  {tyre:>4} | {gear:>1} {DRS} {speed:03}",
+                "{idx:02} {pos:02} {driver} {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1}  {tyre:>4} | {gear:>1} {DRS} {speed:>3} | {state:^5}",
                 driver      = car.driver.getDriver(),
                 timeLastLap = car.time.lastLap,
                 interval    = car.time.interval,
@@ -802,7 +805,8 @@ fn main() {
                 tyre        = car.tyres,
                 gear        = car.telemetry.gear,
                 DRS         = car.Drs,
-                speed       = car.telemetry.speed,
+                speed       = car.telemetry.speed.kph,
+                state       = car.carStatus
             );
         }
 

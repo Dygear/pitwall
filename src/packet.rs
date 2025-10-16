@@ -396,6 +396,28 @@ impl Session
     }
 }
 
+impl fmt::Display for Session {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self
+        {
+            Self::Practice1     => write!(f, "FP1"),
+            Self::Practice2     => write!(f, "FP2"),
+            Self::Practice3     => write!(f, "FP3"),
+            Self::ShortPractice => write!(f, "SP"),
+            Self::Quali1        => write!(f, "Q1"),
+            Self::Quali2        => write!(f, "Q2"),
+            Self::Quali3        => write!(f, "Q3"),
+            Self::ShortQuli     => write!(f, "SQ"),
+            Self::OneShotQuli   => write!(f, "1SQ"),
+            Self::Race          => write!(f, "Race"),
+            Self::Race2         => write!(f, "Race2"),
+            Self::Race3         => write!(f, "Race3"),
+            Self::TimeTrial     => write!(f, "Time"),
+            _                   => write!(f, ""),
+        }
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Weather {
@@ -1835,7 +1857,7 @@ impl PacketCarSetups
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Kph {
-    kph: u16
+    pub kph: u16
 }
 
 impl Kph {
