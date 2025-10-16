@@ -7,17 +7,18 @@ use std::fmt;
 // https://answers.ea.com/t5/General-Discussion/F1-22-UDP-Specification/td-p/11551274
 // https://forums.ea.com/blog/f1-games-game-info-hub-en/ea-sports%e2%84%a2-f1%c2%ae25-udp-specification/12187347
 
-/**
- * # Packet Header
- * Each packet has the following header:
- * Size: 24 Bytes
- */
+//
+// # Packet Header
+// Each packet has the following header:
+// Size: 29 Bytes
+//
 
-#[repr(C, packed)] // Size: 24 Bytes
+#[repr(C, packed)] // Size: 29 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Header
 {
-    pub packetFormat: u16,              // 2022
+    pub packetFormat: u16,              // 2025
+    pub gameYear: u8,                   // Game year - last two digits e.g. 25
     pub gameMajorVersion: u8,           // Game major version - "X.00"
     pub gameMinorVersion: u8,           // Game minor version - "1.XX"
     pub packetVersion: u8,              // Version of this packet type, all start from 1
@@ -25,6 +26,7 @@ pub struct Header
     pub sessionUID: u64,                // Unique identifier for the session
     pub sessionTime: f32,               // Session timestamp
     pub frameIdentifier: u32,           // Identifier for the frame the data was retrieved on
+    pub overallFrameIdentifier: u32,    // Overall identifier for the frame the data was retrieved on, doesn't go back after flashbacks
     pub playerCarIndex: u8,             // Index of player's car in the array
     pub secondaryPlayerCarIndex: u8,    // Index of secondary player's car in the array (splitscreen) 255 if no second player
 }
@@ -34,16 +36,18 @@ impl Header
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            packetFormat           : u16::from_le_bytes([bytes[0], bytes[1]]),
-            gameMajorVersion       : bytes[2],
-            gameMinorVersion       : bytes[3],
-            packetVersion          : bytes[4],
-            packetId               : PacketId::from_u8(bytes[5]),
-            sessionUID             : u64::from_le_bytes([bytes[ 6], bytes[ 7], bytes[ 8], bytes[ 9], bytes[10], bytes[11], bytes[12], bytes[13]]),
-            sessionTime            : f32::from_le_bytes([bytes[14], bytes[15], bytes[16], bytes[17]]),
-            frameIdentifier        : u32::from_le_bytes([bytes[18], bytes[19], bytes[20], bytes[21]]),
-            playerCarIndex         : bytes[22],
-            secondaryPlayerCarIndex: bytes[23],
+            packetFormat            : u16::from_le_bytes([bytes[0], bytes[1]]),
+            gameYear                : bytes[2],
+            gameMajorVersion        : bytes[3],
+            gameMinorVersion        : bytes[4],
+            packetVersion           : bytes[5],
+            packetId                : PacketId::from_u8(bytes[6]),
+            sessionUID              : u64::from_le_bytes([bytes[ 7], bytes[ 8], bytes[ 9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14]]),
+            sessionTime             : f32::from_le_bytes([bytes[15], bytes[16], bytes[17], bytes[18]]),
+            frameIdentifier         : u32::from_le_bytes([bytes[19], bytes[20], bytes[21], bytes[22]]),
+            overallFrameIdentifier  : u32::from_le_bytes([bytes[23], bytes[24], bytes[25], bytes[26]]),
+            playerCarIndex          : bytes[27],
+            secondaryPlayerCarIndex : bytes[28],
         }
     }
 
@@ -57,10 +61,8 @@ impl Header
     }
 }
 
-/**
- * # Packet IDs
- * The packets IDs are as follows
- */
+/// # Packet IDs
+/// The packets IDs are as follows
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum PacketId {
@@ -76,6 +78,10 @@ pub enum PacketId {
     LobbyInfo = 9,                      // Information about players in a multiplayer lobby
     CarDamage = 10,                     // Damage status for all cars
     SessionHistory = 11,                // Lap and tyre data for session
+    TyreSets = 12,                      // Extended tyre set data
+    MotionEx = 13,                      // Extended motion data for player car
+    TimeTrial = 14,                     // Time Trial specific data
+    LapPositions = 15,                  // Lap positions on each lap so a chart can be constructed
     #[default]
     Poisoned = 255,
 }
@@ -95,19 +101,51 @@ impl PacketId {
             9 => PacketId::LobbyInfo,
             10=> PacketId::CarDamage,
             11=> PacketId::SessionHistory,
+            12=> PacketId::TyreSets,
+            13=> PacketId::MotionEx,
+            14=> PacketId::TimeTrial,
+            15=> PacketId::LapPositions,
             _ => PacketId::Poisoned,
         }
     }
 }
 
-/**
- * # Motion Packet
- * The motion packet gives physics data for all the cars being driven. There is additional data for the car being driven with the goal of being able to drive a motion platform setup.
- * N.B. For the normalised vectors below, to convert to float values divide by 32767.0f – 16-bit signed values are used to pack the data and on the assumption that direction values are always between -1.0f and 1.0f.
- * Frequency: Rate as specified in menus
- * Size: 1464 bytes
- * Version: 1
- */
+/// # Motion Packet
+/// The motion packet gives physics data for all the cars being driven. There is additional data for the car being driven with the goal of being able to drive a motion platform setup.
+/// N.B. For the normalised vectors below, to convert to float values divide by 32767.0f – 16-bit signed values are used to pack the data and on the assumption that direction values are always between -1.0f and 1.0f.
+/// Frequency: Rate as specified in menus
+/// Size: 1464 bytes
+/// Version: 1
+#[repr(C, packed)] // Size: 60 Bytes
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CarMotion
+{
+    pub worldPosition: Vector,          // World space position
+    pub worldVelocity: Vector,          // Velocity in world space
+    pub worldForward: Direction,        // World space forward direction (normalised)
+    pub worldRight: Direction,          // World space right direction (normalised)
+    pub gForce: Forces,                 // G-Forces
+    pub yaw: f32,                       // Yaw angle in radians
+    pub pitch: f32,                     // Pitch angle in radians
+    pub roll: f32,                      // Roll angle in radians
+}
+
+impl CarMotion
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            worldPosition     :    Vector::unpack(&bytes[ 0..12]),
+            worldVelocity     :    Vector::unpack(&bytes[12..24]),
+            worldForward      : Direction::unpack(&bytes[24..30]),
+            worldRight        : Direction::unpack(&bytes[30..36]),
+            gForce            :    Forces::unpack(&bytes[36..48]),
+            yaw               : f32::from_le_bytes([bytes[48], bytes[49], bytes[50], bytes[51]]),
+            pitch             : f32::from_le_bytes([bytes[52], bytes[53], bytes[54], bytes[55]]),
+            roll              : f32::from_le_bytes([bytes[56], bytes[57], bytes[58], bytes[59]]),
+        }
+    }
+}
 
 #[repr(C, packed)] // Size: 16 Bytes
 #[derive(Debug, Default, Clone, Copy)]
@@ -172,39 +210,6 @@ impl Forces
     }
 }
 
-
-
-#[repr(packed)] // Size: 60 Bytes
-#[derive(Debug, Default, Clone, Copy)]
-pub struct CarMotion
-{
-    pub worldPosition: Vector,          // World space position
-    pub worldVelocity: Vector,          // Velocity in world space
-    pub worldForward: Direction,        // World space forward direction (normalised)
-    pub worldRight: Direction,          // World space right direction (normalised)
-    pub gForce: Forces,                 // G-Forces
-    pub yaw: f32,                       // Yaw angle in radians
-    pub pitch: f32,                     // Pitch angle in radians
-    pub roll: f32,                      // Roll angle in radians
-}
-
-impl CarMotion
-{
-    pub fn unpack(bytes: &[u8]) -> Self
-    {
-        Self {
-            worldPosition     :    Vector::unpack(&bytes[ 0..12]),
-            worldVelocity     :    Vector::unpack(&bytes[12..24]),
-            worldForward      : Direction::unpack(&bytes[24..30]),
-            worldRight        : Direction::unpack(&bytes[30..36]),
-            gForce            :    Forces::unpack(&bytes[36..48]),
-            yaw               : f32::from_le_bytes([bytes[48], bytes[49], bytes[50], bytes[51]]),
-            pitch             : f32::from_le_bytes([bytes[52], bytes[53], bytes[54], bytes[55]]),
-            roll              : f32::from_le_bytes([bytes[56], bytes[57], bytes[58], bytes[59]]),
-        }
-    }
-}
-
 #[repr(C, packed)] // Size: 16 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Wheels
@@ -259,15 +264,15 @@ impl PacketMotion
             carMotion: Self::carMotion(&bytes[size_of::<Header>()..size_of::<Header>()+(size_of::<CarMotion>()*22)]),
 
             // Extra player car ONLY data
-            suspensionPosition    : Wheels::unpack(&bytes[1344..1360]),
-            suspensionVelocity    : Wheels::unpack(&bytes[1360..1376]),
-            suspensionAcceleration: Wheels::unpack(&bytes[1376..1392]),
-            wheelSpeed            : Wheels::unpack(&bytes[1392..1408]),
-            wheelSlip             : Wheels::unpack(&bytes[1408..1424]),
-            localVelocity         : Vector::unpack(&bytes[1424..1436]),
-            angularVelocity       : Vector::unpack(&bytes[1436..1448]),
-            angularAcceleration   : Vector::unpack(&bytes[1448..1460]),
-            frontWheelsAngle      : f32::from_le_bytes([bytes[1460], bytes[1461], bytes[1462], bytes[1463]]),
+            suspensionPosition    : Wheels::unpack(&bytes[1349..1365]),
+            suspensionVelocity    : Wheels::unpack(&bytes[1365..1381]),
+            suspensionAcceleration: Wheels::unpack(&bytes[1381..1397]),
+            wheelSpeed            : Wheels::unpack(&bytes[1397..1413]),
+            wheelSlip             : Wheels::unpack(&bytes[1413..1429]),
+            localVelocity         : Vector::unpack(&bytes[1429..1441]),
+            angularVelocity       : Vector::unpack(&bytes[1441..1453]),
+            angularAcceleration   : Vector::unpack(&bytes[1453..1465]),
+            frontWheelsAngle      : f32::from_le_bytes([bytes[1465], bytes[1466], bytes[1467], bytes[1468]]),
         }
     }
 
@@ -453,7 +458,7 @@ pub struct WeatherForecast
     pub timeOffset: u8,                 // Time in minutes the forecast is for
     pub weather: Weather,               // u8
     pub trackTemperature: i8,           // Track temp. in degrees Celsius
-    pub trackTChange: Temperature,      // i8
+    pub trackChange: Temperature,       // i8
     pub airTemperature: i8,             // Air temp. in degrees celsius
     pub airChange: Temperature,         // i8
     pub rainPercentage: u8,             // Rain percentage (0-100)
@@ -468,7 +473,7 @@ impl WeatherForecast
             timeOffset      : bytes[1],
             weather         : Weather::from_u8(&bytes[2]),
             trackTemperature: bytes[3] as i8,
-            trackTChange    : Temperature::from_u8(&bytes[4]),
+            trackChange     : Temperature::from_u8(&bytes[4]),
             airTemperature  : bytes[5] as i8,
             airChange       : Temperature::from_u8(&bytes[6]),
             rainPercentage  : bytes[7],
@@ -476,54 +481,89 @@ impl WeatherForecast
     }
 }
 
-#[repr(C, packed)] // Size: 632 Bytes
+#[repr(C, packed)] // Size: 753 Bytes
 #[derive(Debug, Clone, Copy)]
 pub struct PacketSession
 {
-    pub header: Header,                 // 24 Bytes - Header
+    pub header: Header,                         // 29 Bytes - Header
 
-    pub weather: Weather,               // u8
-    pub trackTemperature: i8,           // Track temp. in degrees celsius
-    pub airTemperature: i8,             // Air temp. in degrees celsius
-    pub totalLaps: u8,                  // Total number of laps in this race
-    pub trackLength: u16,               // Track length in metres
-    pub sessionType: Session,           // u8
-    pub trackId: i8,                    // -1 for unknown, see appendix
-    pub formula: Formula,               // u8
-    pub sessionTimeLeft: u16,           // Time left in session in seconds
-    pub sessionDuration: u16,           // Session duration in seconds
-    pub pitSpeedLimit: u8,              // Pit speed limit in kilometres per hour
-    pub gamePaused: u8,                 // Whether the game is paused – network game only
-    pub isSpectating: u8,               // Whether the player is spectating
-    pub spectatorCarIndex: u8,          // Index of the car being spectated
-    pub sliProNativeSupport: SLIPro,    // SLI Pro support, 0 = inactive, 1 = active
-    pub numMarshalZones: u8,            // Number of marshal zones to follow
-    pub marshalZones: [MarshalZone; 21],// 105 Bytes - List of marshal zones – max 21
-    pub safetyCarStatus: SafetyCar,     // u8
-    pub networkGame: NetworkGame,       // 0 = offline, 1 = online
-    pub numWeatherForecasts: u8,        // Number of weather samples to follow
-    pub weatherForecastSamples: [WeatherForecast; 56], // 448 Bytes - of weather forecast samples
-    pub forecastAccuracy: Accuracy,     // 0 = Perfect, 1 = Approximate
-    pub aiDifficulty: u8,               // AI Difficulty rating – 0-110
-    pub seasonLinkIdentifier: u32,      // Identifier for season - persists across saves
-    pub weekendLinkIdentifier: u32,     // Identifier for weekend - persists across saves
-    pub sessionLinkIdentifier: u32,     // Identifier for session - persists across saves
-    pub pitStopWindowIdealLap: u8,      // Ideal lap to pit on for current strategy (player)
-    pub pitStopWindowLatestLap: u8,     // Latest lap to pit on for current strategy (player)
-    pub pitStopRejoinPosition: u8,      // Predicted position to rejoin at (player)
-    pub steeringAssist: Assist,         // 0 = off, 1 = on
-    pub brakingAssist: u8,              // 0 = off, 1 = low, 2 = medium, 3 = high
-    pub gearboxAssist: u8,              // 1 = manual, 2 = manual & suggested gear, 3 = auto
-    pub pitAssist: Assist,              // 0 = off, 1 = on
-    pub pitReleaseAssist: Assist,       // 0 = off, 1 = on
-    pub ERSAssist: Assist,              // 0 = off, 1 = on
-    pub DRSAssist: Assist,              // 0 = off, 1 = on
-    pub dynamicRacingLine: u8,          // 0 = off, 1 = corners only, 2 = full
-    pub dynamicRacingLineType: u8,      // 0 = 2D, 1 = 3D
-    pub gameMode: u8,                   // Game mode id - see appendix
-    pub ruleSet: u8,                    // Ruleset - see appendix
-    pub timeOfDay: u32,                 // Local time of day - minutes since midnight
-    pub sessionLength: SessionLength,   // u8
+    pub weather: Weather,                       // u8
+    pub trackTemperature: i8,                   // Track temp. in degrees celsius
+    pub airTemperature: i8,                     // Air temp. in degrees celsius
+    pub totalLaps: u8,                          // Total number of laps in this race
+    pub trackLength: u16,                       // Track length in metres
+    pub sessionType: Session,                   // u8
+    pub trackId: i8,                            // -1 for unknown, see appendix
+    pub formula: Formula,                       // u8
+    pub sessionTimeLeft: u16,                   // Time left in session in seconds
+    pub sessionDuration: u16,                   // Session duration in seconds
+    pub pitSpeedLimit: u8,                      // Pit speed limit in kilometres per hour
+    pub gamePaused: u8,                         // Whether the game is paused – network game only
+    pub isSpectating: u8,                       // Whether the player is spectating
+    pub spectatorCarIndex: u8,                  // Index of the car being spectated
+    pub sliProNativeSupport: SLIPro,            // u8
+    pub numMarshalZones: u8,                    // Number of marshal zones to follow
+    pub marshalZones: [MarshalZone; 21],        // 105 Bytes - List of marshal zones – max 21
+    pub safetyCarStatus: SafetyCar,             // u8
+    pub networkGame: NetworkGame,               // u8
+    pub numWeatherForecasts: u8,                // Number of weather samples to follow
+    pub weatherForecast: [WeatherForecast; 64], // 512 Bytes - of weather forecast samples
+    pub forecastAccuracy: Accuracy,             // u8
+    pub aiDifficulty: u8,                       // AI Difficulty rating – 0-110
+    pub seasonLinkIdentifier: u32,              // Identifier for season - persists across saves
+    pub weekendLinkIdentifier: u32,             // Identifier for weekend - persists across saves
+    pub sessionLinkIdentifier: u32,             // Identifier for session - persists across saves
+    pub pitStopWindowIdealLap: u8,              // Ideal lap to pit on for current strategy (player)
+    pub pitStopWindowLatestLap: u8,             // Latest lap to pit on for current strategy (player)
+    pub pitStopRejoinPosition: u8,              // Predicted position to rejoin at (player)
+    pub steeringAssist: Assist,                 // u8
+    pub brakingAssist: u8,                      // 0 = off, 1 = low, 2 = medium, 3 = high
+    pub gearboxAssist: u8,                      // 1 = manual, 2 = manual & suggested gear, 3 = auto
+    pub pitAssist: Assist,                      // u8
+    pub pitReleaseAssist: Assist,               // u8
+    pub ERSAssist: Assist,                      // u8
+    pub DRSAssist: Assist,                      // u8
+    pub dynamicRacingLine: u8,                  // 0 = off, 1 = corners only, 2 = full
+    pub dynamicRacingLineType: u8,              // 0 = 2D, 1 = 3D
+    pub gameMode: u8,                           // Game mode id - see appendix
+    pub ruleSet: u8,                            // Ruleset - see appendix
+    pub timeOfDay: u32,                         // Local time of day - minutes since midnight
+    pub sessionLength: SessionLength,           // u8
+    pub speedUnitsLeadPlayer: u8,               // 0 = MPH, 1 = KPH
+    pub temperatureUnitsLeadPlayer: u8,         // 0 = Celsius, 1 = Fahrenheit
+    pub speedUnitsSecondaryPlayer: u8,          // 0 = MPH, 1 = KPH
+    pub temperatureUnitsSecondaryPlayer: u8,    // 0 = Celsius, 1 = Fahrenheit
+    pub numSafetyCarPeriods: u8,                // Number of safety cars called during session
+    pub numVirtualSafetyCarPeriods: u8,         // Number of virtual safety cars called during session
+    pub numRedFlagPeriods: u8,                  // Number of red flags called during session
+    pub equalCarPerformance: u8,                // 0 = Off, 1 = On
+    pub recoveryMode: u8,                       // 0 = None, 1 = Flashbacks, 2 = Auto-recovery
+    pub flashbackLimit: u8,                     // 0 = Low, 1 = Medium, 2 = High, 3 = Unlimited
+    pub surfaceType: u8,                        // 0 = Simplified, 1 = Realistic
+    pub lowFuelMode: u8,                        // 0 = Easy, 1 = Hard
+    pub raceStarts: u8,                         // 0 = Manual, 1 = Assisted
+    pub tyreTemperature: u8,                    // 0 = Surface only, 1 = Surface & Carcass
+    pub pitLaneTyreSim: u8,                     // 0 = On, 1 = Off
+    pub carDamage: u8,                          // 0 = Off, 1 = Reduced, 2 = Standard, 3 = Simulation
+    pub carDamageRate: u8,                      // 0 = Reduced, 1 = Standard, 2 = Simulation
+    pub collisions: u8,                         // 0 = Off, 1 = Player-to-Player Off, 2 = On
+    pub collisionsOffForFirstLapOnly: u8,       // 0 = Disabled, 1 = Enabled
+    pub mpUnsafePitRelease: u8,                 // 0 = On, 1 = Off (Multiplayer)
+    pub mpOffForGriefing: u8,                   // 0 = Disabled, 1 = Enabled (Multiplayer)
+    pub cornerCuttingStringency: u8,            // 0 = Regular, 1 = Strict
+    pub parcFermeRules: u8,                     // 0 = Off, 1 = On
+    pub pitStopExperience: u8,                  // 0 = Automatic, 1 = Broadcast, 2 = Immersive
+    pub safetyCar: u8,                          // 0 = Off, 1 = Reduced, 2 = Standard, 3 = Increased
+    pub safetyCarExperience: u8,                // 0 = Broadcast, 1 = Immersive
+    pub formationLap: u8,                       // 0 = Off, 1 = On
+    pub formationLapExperience: u8,             // 0 = Broadcast, 1 = Immersive
+    pub redFlags: u8,                           // 0 = Off, 1 = Reduced, 2 = Standard, 3 = Increased
+    pub affectsLicenceLevelSolo: u8,            // 0 = Off, 1 = On
+    pub affectsLicenceLevelMP: u8,              // 0 = Off, 1 = On
+    pub numSessionsInWeekend: u8,               // Number of session in following array
+    pub weekendStructure: [u8; 12],             // List of session types to show weekend structure - see appendix for types
+    pub sector2LapDistanceStart: f32,           // Distance in m around track where sector 2 starts
+    pub sector3LapDistanceStart: f32,           // Distance in m around track where sector 3 starts
 }
 
 impl PacketSession
@@ -531,50 +571,85 @@ impl PacketSession
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            header                : Header::unpack(bytes),
+            header                          : Header::unpack(bytes),
 
-            weather               : Weather::from_u8(&bytes[25]),
-            trackTemperature      : bytes[26] as i8,
-            airTemperature        : bytes[27] as i8,
-            totalLaps             : bytes[28],
-            trackLength           : u16::from_le_bytes([bytes[29], bytes[30]]),
-            sessionType           : Session::from_u8(&bytes[31]),
-            trackId               : bytes[32] as i8,
-            formula               : Formula::from_u8(&bytes[33]),
-            sessionTimeLeft       : u16::from_le_bytes([bytes[34], bytes[35]]),
-            sessionDuration       : u16::from_le_bytes([bytes[36], bytes[37]]),
-            pitSpeedLimit         : bytes[38],
-            gamePaused            : bytes[39],
-            isSpectating          : bytes[40],
-            spectatorCarIndex     : bytes[41],
-            sliProNativeSupport   : SLIPro::from_u8(&bytes[42]),
-            numMarshalZones       : bytes[43],
-            marshalZones          : Self::marshalZone(&bytes[44..149]),
-            safetyCarStatus       : SafetyCar::from_u8(&bytes[149]),
-            networkGame           : NetworkGame::from_u8(&bytes[150]),
-            numWeatherForecasts   : bytes[151],
-            weatherForecastSamples: Self::weatherForecast(&bytes[152..600]),
-            forecastAccuracy      : Accuracy::from_u8(&bytes[600]),
-            aiDifficulty          : bytes[601],
-            seasonLinkIdentifier  : u32::from_le_bytes([bytes[602], bytes[603], bytes[604], bytes[605]]),
-            weekendLinkIdentifier : u32::from_le_bytes([bytes[606], bytes[607], bytes[608], bytes[609]]),
-            sessionLinkIdentifier : u32::from_le_bytes([bytes[610], bytes[611], bytes[612], bytes[613]]),
-            pitStopWindowIdealLap : bytes[614],
-            pitStopWindowLatestLap: bytes[615],
-            pitStopRejoinPosition : bytes[616],
-            steeringAssist        : Assist::from_u8(&bytes[617]),
-            brakingAssist         : bytes[618],
-            gearboxAssist         : bytes[619],
-            pitAssist             : Assist::from_u8(&bytes[620]),
-            pitReleaseAssist      : Assist::from_u8(&bytes[621]),
-            ERSAssist             : Assist::from_u8(&bytes[622]),
-            DRSAssist             : Assist::from_u8(&bytes[623]),
-            dynamicRacingLine     : bytes[624],
-            dynamicRacingLineType : bytes[625],
-            gameMode              : bytes[626],
-            ruleSet               : bytes[627],
-            timeOfDay             : u32::from_le_bytes([bytes[628], bytes[629], bytes[630], bytes[631]]),
-            sessionLength         : SessionLength::from_u8(&bytes[632]),
+            weather                         : Weather::from_u8(&bytes[29]),
+            trackTemperature                : bytes[30] as i8,
+            airTemperature                  : bytes[31] as i8,
+            totalLaps                       : bytes[32],
+            trackLength                     : u16::from_le_bytes([bytes[33], bytes[34]]),
+            sessionType                     : Session::from_u8(&bytes[35]),
+            trackId                         : bytes[36] as i8,
+            formula                         : Formula::from_u8(&bytes[37]),
+            sessionTimeLeft                 : u16::from_le_bytes([bytes[38], bytes[39]]),
+            sessionDuration                 : u16::from_le_bytes([bytes[40], bytes[41]]),
+            pitSpeedLimit                   : bytes[42],
+            gamePaused                      : bytes[43],
+            isSpectating                    : bytes[44],
+            spectatorCarIndex               : bytes[45],
+            sliProNativeSupport             : SLIPro::from_u8(&bytes[46]),
+            numMarshalZones                 : bytes[47],
+            marshalZones                    : Self::marshalZone(&bytes[48..153]),
+            safetyCarStatus                 : SafetyCar::from_u8(&bytes[153]),
+            networkGame                     : NetworkGame::from_u8(&bytes[154]),
+            numWeatherForecasts             : bytes[155],
+            weatherForecast                 : Self::weatherForecast(&bytes[156..668]),
+            forecastAccuracy                : Accuracy::from_u8(&bytes[668]),
+            aiDifficulty                    : bytes[669],
+            seasonLinkIdentifier            : u32::from_le_bytes([bytes[670], bytes[671], bytes[672], bytes[673]]),
+            weekendLinkIdentifier           : u32::from_le_bytes([bytes[674], bytes[675], bytes[676], bytes[677]]),
+            sessionLinkIdentifier           : u32::from_le_bytes([bytes[678], bytes[679], bytes[680], bytes[681]]),
+            pitStopWindowIdealLap           : bytes[682],
+            pitStopWindowLatestLap          : bytes[683],
+            pitStopRejoinPosition           : bytes[684],
+            steeringAssist                  : Assist::from_u8(&bytes[685]),
+            brakingAssist                   : bytes[686],
+            gearboxAssist                   : bytes[687],
+            pitAssist                       : Assist::from_u8(&bytes[688]),
+            pitReleaseAssist                : Assist::from_u8(&bytes[689]),
+            ERSAssist                       : Assist::from_u8(&bytes[690]),
+            DRSAssist                       : Assist::from_u8(&bytes[691]),
+            dynamicRacingLine               : bytes[692],
+            dynamicRacingLineType           : bytes[693],
+            gameMode                        : bytes[694],
+            ruleSet                         : bytes[695],
+            timeOfDay                       : u32::from_le_bytes([bytes[696], bytes[697], bytes[698], bytes[699]]),
+            sessionLength                   : SessionLength::from_u8(&bytes[700]),
+            speedUnitsLeadPlayer            : bytes[701],
+            temperatureUnitsLeadPlayer      : bytes[702],
+            speedUnitsSecondaryPlayer       : bytes[703],
+            temperatureUnitsSecondaryPlayer : bytes[704],
+            numSafetyCarPeriods             : bytes[705],
+            numVirtualSafetyCarPeriods      : bytes[706],
+            numRedFlagPeriods               : bytes[707],
+            equalCarPerformance             : bytes[708],
+            recoveryMode                    : bytes[709],
+            flashbackLimit                  : bytes[710],
+            surfaceType                     : bytes[711],
+            lowFuelMode                     : bytes[712],
+            raceStarts                      : bytes[713],
+            tyreTemperature                 : bytes[714],
+            pitLaneTyreSim                  : bytes[715],
+            carDamage                       : bytes[716],
+            carDamageRate                   : bytes[717],
+            collisions                      : bytes[718],
+            collisionsOffForFirstLapOnly    : bytes[719],
+            mpUnsafePitRelease              : bytes[720],
+            mpOffForGriefing                : bytes[721],
+            cornerCuttingStringency         : bytes[722],
+            parcFermeRules                  : bytes[723],
+            pitStopExperience               : bytes[724],
+            safetyCar                       : bytes[725],
+            safetyCarExperience             : bytes[726],
+            formationLap                    : bytes[727],
+            formationLapExperience          : bytes[728],
+            redFlags                        : bytes[729],
+            affectsLicenceLevelSolo         : bytes[730],
+            affectsLicenceLevelMP           : bytes[731],
+            numSessionsInWeekend            : bytes[732],
+            weekendStructure                : [bytes[733], bytes[734], bytes[735], bytes[736], bytes[737], bytes[738], bytes[739], bytes[740], bytes[741], bytes[742], bytes[743], bytes[744]],
+            sector2LapDistanceStart         : f32::from_le_bytes([bytes[745], bytes[746], bytes[747], bytes[748]]),
+            sector3LapDistanceStart         : f32::from_le_bytes([bytes[749], bytes[750], bytes[751], bytes[752]]),
         }
     }
 
@@ -595,9 +670,9 @@ impl PacketSession
         mz
     }
 
-    pub fn weatherForecast(bytes: &[u8]) -> [WeatherForecast; 56]
+    pub fn weatherForecast(bytes: &[u8]) -> [WeatherForecast; 64]
     {
-        let mut wf = [WeatherForecast::default(); 56];
+        let mut wf = [WeatherForecast::default(); 64];
 
         let size = size_of::<WeatherForecast>();
 
@@ -792,78 +867,89 @@ impl SessionLength
     }
 }
 
-/**
- * # Lap Data Packet
- * The lap data packet gives details of all the cars in the session.
- * Frequency: Rate as specified in menus
- * Size: 972 bytes
- * Version: 1
- */
 
-#[repr(C, packed)] // Size: 43 Bytes
+/// # Lap Data Packet
+/// The lap data packet gives details of all the cars in the session.
+/// Frequency: Rate as specified in menus
+/// Size: 1285 bytes
+/// Version: 1
+#[repr(C, packed)] // Size: 56 Bytes
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Lap
+pub struct Car
 {
-    pub lastLapTimeInMS: u32,               // u32 - Last lap time in milliseconds
-    pub currentLapTimeInMS: u32,            // u32 - Current time around the lap in milliseconds
-    pub sector1TimeInMS: u16,               // u16 - Sector 1 time in milliseconds
-    pub sector2TimeInMS: u16,               // u16 - Sector 2 time in milliseconds
-    pub lapDistance: f32,                   // f32 - Distance vehicle is around current lap in metres – could
-                                            //       be negative if line hasn’t been crossed yet
-    pub totalDistance: f32,                 // f32 - Total distance travelled in session in metres – could
-                                            //        be negative if line hasn’t been crossed yet
-    pub safetyCarDelta: f32,                // f32 - Delta in seconds for safety car
-    pub carPosition: u8,                    // u8  - Car race position
-    pub currentLapNum: u8,                  // u8  - Current lap number
-    pub pitStatus: PitStatus,               // u8  - 0 = none, 1 = pitting, 2 = in pit area
-    pub numPitStops: u8,                    // u8  - Number of pit stops taken in this race
-    pub sector: u8,                         // u8  - 0 = sector1, 1 = sector2, 2 = sector3
-    pub currentLapInvalid: u8,              // u8  - Current lap invalid - 0 = valid, 1 = invalid
-    pub penalties: u8,                      // u8  - Accumulated time penalties in seconds to be added
-    pub warnings: u8,                       // u8  - Accumulated number of warnings issued
-    pub numUnservedDriveThroughPens: u8,    // u8  - Num drive through pens left to serve
-    pub numUnservedStopGoPens: u8,          // u8  - Num stop go pens left to serve
-    pub gridPosition: u8,                   // u8  - Grid position the vehicle started the race in
-    pub driverStatus: CarState,             // u8  - Status of driver - 0 = in garage, 1 = flying lap
-                                            //        2 = in lap, 3 = out lap, 4 = on track
-    pub resultStatus: ResultStatus,         // u8  - Result status - 0 = invalid, 1 = inactive, 2 = active
-                                            //        3 = finished, 4 = didnotfinish, 5 = disqualified
-                                            //        6 = not classified, 7 = retired
-    pub pitLaneTimerActive: u8,             // u8  - Pit lane timing, 0 = inactive, 1 = active
-    pub pitLaneTimeInLaneInMS: u16,         // u16 - If active, the current time spent in the pit lane in ms
-    pub pitStopTimerInMS: u16,              // u16 - Time of the actual pit stop in ms
-    pub pitStopShouldServePen: u8,          // u8  - Whether the car should serve a penalty at this stop
+    pub lastLapTimeInMS: u32,             // Last lap time in milliseconds
+    pub currentLapTimeInMS: u32,          // Current time around the lap in milliseconds
+    pub sector1TimeMSPart: u16,           // Sector 1 time milliseconds part
+    pub sector1TimeMinutesPart: u8,       // Sector 1 whole minute part
+    pub sector2TimeMSPart: u16,           // Sector 2 time milliseconds part
+    pub sector2TimeMinutesPart: u8,       // Sector 2 whole minute part
+    pub deltaToCarInFrontMSPart: u16,     // Time delta to car in front milliseconds part
+    pub deltaToCarInFrontMinutesPart: u8, // Time delta to car in front whole minute part
+    pub deltaToRaceLeaderMSPart: u16,     // Time delta to race leader milliseconds part
+    pub deltaToRaceLeaderMinutesPart: u8, // Time delta to race leader whole minute part
+    pub lapDistance: f32,                 // Distance vehicle is around current lap in metres – could be negative if line hasn’t been crossed yet
+    pub totalDistance: f32,               // Total distance travelled in session in metres – could be negative if line hasn’t been crossed yet
+    pub safetyCarDelta: f32,              // Delta in seconds for safety car
+    pub racePosition: u8,                 // Car race position
+    pub currentLapNum: u8,                // Current lap number
+    pub pitStatus: PitStatus,             // 0 = none, 1 = pitting, 2 = in pit area
+    pub numPitStops: u8,                  // Number of pit stops taken in this race
+    pub sector: u8,                       // 0 = sector1, 1 = sector2, 2 = sector3
+    pub currentLapInvalid: u8,            // Current lap invalid - 0 = valid, 1 = invalid
+    pub penalties: u8,                    // Accumulated time penalties in seconds to be added
+    pub totalWarnings: u8,                // Accumulated number of warnings issued
+    pub cornerCuttingWarnings: u8,        // Accumulated number of corner cutting warnings issued
+    pub numUnservedDriveThroughPens: u8,  // Num drive through pens left to serve
+    pub numUnservedStopGoPens: u8,        // Num stop go pens left to serve
+    pub gridPosition: u8,                 // Grid position the vehicle started the race in
+    pub driverStatus: CarState,           // Status of driver - 0 = in garage, 1 = flying lap, 2 = in lap, 3 = out lap, 4 = on track
+    pub resultStatus: ResultStatus,       // Result status - 0 = invalid, 1 = inactive, 2 = active, 3 = finished, 4 = didnotfinish, 5 = disqualified, 6 = not classified, 7 = retired
+    pub pitLaneTimerActive: u8,           // Pit lane timing, 0 = inactive, 1 = active
+    pub pitLaneTimeInLaneInMS: u16,       // If active, the current time spent in the pit lane in ms
+    pub pitStopTimerInMS: u16,            // Time of the actual pit stop in ms
+    pub pitStopShouldServePen: u8,        // Whether the car should serve a penalty at this stop
+    pub speedTrapFastestSpeed: f32,       // Fastest speed through speed trap for this car in kmph
+    pub speedTrapFastestLap: u8,          // Lap no the fastest speed was achieved, 255 = not set
 }
 
-impl Lap
+impl Car
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
         Self {
-            lastLapTimeInMS            : u32::from_le_bytes([bytes[ 0], bytes[ 1], bytes[ 2], bytes[ 3]]),
-            currentLapTimeInMS         : u32::from_le_bytes([bytes[ 4], bytes[ 5], bytes[ 6], bytes[ 7]]),
-            sector1TimeInMS            : u16::from_le_bytes([bytes[ 8], bytes[ 9]]),
-            sector2TimeInMS            : u16::from_le_bytes([bytes[10], bytes[11]]),
-            lapDistance                : f32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
-            totalDistance              : f32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]),
-            safetyCarDelta             : f32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
-            carPosition                : bytes[24],
-            currentLapNum              : bytes[25],
-            pitStatus                  : PitStatus::from_u8(bytes[26]),
-            numPitStops                : bytes[27],
-            sector                     : bytes[28],
-            currentLapInvalid          : bytes[29],
-            penalties                  : bytes[30],
-            warnings                   : bytes[31],
-            numUnservedDriveThroughPens: bytes[32],
-            numUnservedStopGoPens      : bytes[33],
-            gridPosition               : bytes[34],
-            driverStatus               : CarState::from_u8(bytes[35]),
-            resultStatus               : ResultStatus::from_u8(bytes[36]),
-            pitLaneTimerActive         : bytes[37],
-            pitLaneTimeInLaneInMS      : u16::from_le_bytes([bytes[38], bytes[39]]),
-            pitStopTimerInMS           : u16::from_le_bytes([bytes[40], bytes[41]]),
-            pitStopShouldServePen      : bytes[42],
+            lastLapTimeInMS: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            currentLapTimeInMS: u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            sector1TimeMSPart: u16::from_le_bytes([bytes[8], bytes[9]]),
+            sector1TimeMinutesPart: bytes[10],
+            sector2TimeMSPart: u16::from_le_bytes([bytes[11], bytes[12]]),
+            sector2TimeMinutesPart: bytes[13],
+            deltaToCarInFrontMSPart: u16::from_le_bytes([bytes[14], bytes[15]]),
+            deltaToCarInFrontMinutesPart: bytes[16],
+            deltaToRaceLeaderMSPart: u16::from_le_bytes([bytes[17], bytes[18]]),
+            deltaToRaceLeaderMinutesPart: bytes[19],
+            lapDistance: f32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
+            totalDistance: f32::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]),
+            safetyCarDelta: f32::from_le_bytes([bytes[28], bytes[29], bytes[30], bytes[31]]),
+            racePosition: bytes[32],
+            currentLapNum: bytes[33],
+            pitStatus: PitStatus::from_u8(bytes[34]),
+            numPitStops: bytes[35],
+            sector: bytes[36],
+            currentLapInvalid: bytes[37],
+            penalties: bytes[38],
+            totalWarnings: bytes[39],
+            cornerCuttingWarnings: bytes[40],
+            numUnservedDriveThroughPens: bytes[41],
+            numUnservedStopGoPens: bytes[42],
+            gridPosition: bytes[43],
+            driverStatus: CarState::from_u8(bytes[44]),
+            resultStatus: ResultStatus::from_u8(bytes[45]),
+            pitLaneTimerActive: bytes[46],
+            pitLaneTimeInLaneInMS: u16::from_le_bytes([bytes[47], bytes[48]]),
+            pitStopTimerInMS: u16::from_le_bytes([bytes[49], bytes[50]]),
+            pitStopShouldServePen: bytes[51],
+            speedTrapFastestSpeed: f32::from_le_bytes([bytes[52], bytes[53], bytes[54], bytes[55]]),
+            speedTrapFastestLap: bytes[56],
         }
     }
 }
@@ -972,7 +1058,7 @@ pub struct PacketLap
 {
     pub header: Header,                 // 24 Bytes - Header
 
-    pub laps: [Lap; 22],                // Lap data for all cars on track
+    pub cars: [Car; 22],                // Lap data for all cars on track
 
     pub timeTrialPBCarIdx: u8,          // Index of Personal Best car in time trial (255 if invalid)
     pub timeTrialRivalCarIdx: u8,       // Index of Rival car in time trial (255 if invalid)
@@ -982,44 +1068,44 @@ impl PacketLap
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
+        let sz_hdr = size_of::<Header>();
+        let sz_lap = size_of::<Car>();
+
         Self {
             header: Header::unpack(bytes),
 
-            laps: Self::lap(&bytes[24..24+43*22]),
+            cars: Self::lap(&bytes[sz_hdr .. sz_hdr + (sz_lap * 22)]),
 
-            timeTrialPBCarIdx: bytes[970],
-            timeTrialRivalCarIdx: bytes[971],
+            timeTrialPBCarIdx: bytes[sz_hdr + (sz_lap * 22) + 1],
+            timeTrialRivalCarIdx: bytes[sz_hdr + (sz_lap * 22) + 2],
         }
     }
 
-    pub fn lap(bytes: &[u8]) -> [Lap; 22]
+    pub fn lap(bytes: &[u8]) -> [Car; 22]
     {
-        let mut l = [Lap::default(); 22];
+        let mut cars = [Car::default(); 22];
 
-        let size = 43;
+        let size = size_of::<Car>();
 
-        for (i, l) in l.iter_mut().enumerate()
+        for (idx, car) in cars.iter_mut().enumerate()
         {
-            let s = i * size;
+            let s = idx * size;
             let e = s + size;
 
-            *l = Lap::unpack(&bytes[s..e]);
+            *car = Car::unpack(&bytes[s..e]);
         }
 
-        l
+        cars
     }
 }
 
-/**
- * # Event Packet
- * This packet gives details of events that happen during the course of a session.
- * Frequency: When the event occurs
- * Size: 40 bytes
- * Version: 1
- */
-
-// The event details packet is different for each type of event.
-// Make sure only the correct type is interpreted.
+/// # Event Packet
+/// This packet gives details of events that happen during the course of a session.
+/// Frequency: When the event occurs
+/// Size: 40 bytes
+/// Version: 1
+/// The event details packet is different for each type of event.
+/// Make sure only the correct type is interpreted.
 #[repr(C, packed)]
 #[derive(Clone, Copy)]
 pub union EventDetails
@@ -1340,32 +1426,6 @@ impl EventTag
             tag: [bytes[0], bytes[1], bytes[2], bytes[3]]
         }
     }
-
-    pub fn to_str(self) -> &'static str
-    {
-        match &self.tag
-        {
-            b"SSTA" => "SSTA",
-            b"SEND" => "SEND",
-            b"FTLP" => "FTLP",
-            b"RTMT" => "RTMT",
-            b"DRSE" => "DRSE",
-            b"DRSD" => "DRSD",
-            b"TMPT" => "TMPT",
-            b"CHQF" => "CHQF",
-            b"RCWN" => "RCWN",
-            b"PENA" => "PENA",
-            b"SPTP" => "SPTP",
-            b"STLG" => "STLG",
-            b"LGOT" => "LGOT",
-            b"DTSV" => "DTSV",
-            b"SGSV" => "SGSV",
-            b"FLBK" => "FLBK",
-            b"BUTN" => "BUTN",
-            _ => todo!(),
-        }
-
-    }
 }
 
 #[repr(C, packed)] // Size: 24 + 8 + (Depends) Bytes
@@ -1375,6 +1435,7 @@ pub struct PacketEvent
     pub header: Header,                 // 24 Bytes - Header
 
     pub eventStringCode: EventTag,      // u8 * 4 - Event string code, see below
+    pub eventType: EventType,           // Tag for the Event Type.
     pub eventDetails: EventDetails,     // Depends - Event details - should be interpreted differently for each type
 }
 
@@ -1393,12 +1454,32 @@ impl PacketEvent
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
-        let eventTag: EventTag = EventTag::unpack(&bytes[24..28]);
+        let eventTag: EventTag = EventTag::unpack(&bytes[29..34]);
 
         Self {
             header: Header::unpack(bytes),
 
             eventStringCode: eventTag,
+            eventType: match &eventTag.tag {
+                b"SSTA" => EventType::SessionStarted,
+                b"SEND" => EventType::SessionEnded,
+                b"FTLP" => EventType::FastestLap,
+                b"RTMT" => EventType::Retirement,
+                b"DRSE" => EventType::DRSEnabled,
+                b"DRSD" => EventType::DRSDisabled,
+                b"TMPT" => EventType::TeamMateInPits,
+                b"CHQF" => EventType::ChequeredFlag,
+                b"RCWN" => EventType::RaceWinner,
+                b"PENA" => EventType::Penalty,
+                b"SPTP" => EventType::SpeedTrap,
+                b"STLG" => EventType::StartLights,
+                b"LGOT" => EventType::LightsOut,
+                b"DTSV" => EventType::DriveThroughPenaltyServed,
+                b"SGSV" => EventType::StopGoPenaltyServed,
+                b"FLBK" => EventType::Flashback,
+                b"BUTN" => EventType::Buttons,
+                _ => EventType::Poisoned,
+            },
             eventDetails: match &eventTag.tag {
                 b"SSTA" => EventDetails {
                         // Sent when the session starts
@@ -1469,7 +1550,7 @@ impl PacketEvent
                         buttons: Buttons::unpack(&bytes[28..])
                     },
                 _ => {
-                    println!("Unhandled Event: {}", eventTag.to_str());
+                    println!("Unhandled Event: {:?}", eventTag);
                     EventDetails {
                         unknownTag: eventTag.tag
                     }
@@ -1479,28 +1560,56 @@ impl PacketEvent
     }
 }
 
-/**
- * # Participants Packet
- * This is a list of participants in the race. If the vehicle is controlled by AI, then the name will be the driver name. If this is a multiplayer game, the names will be the Steam Id on PC, or the LAN name if appropriate.
- * N.B. on Xbox One, the names will always be the driver name, on PS4 the name will be the LAN name if playing a LAN game, otherwise it will be the driver name. 
- * The array should be indexed by vehicle index.
- * Frequency: Every 5 seconds
- * Size: 1257 bytes
- * Version: 1
- */
+#[derive(Debug, Default, Clone, Copy)]
+#[repr(u8)]
+pub enum EventType {
+    SessionStarted,
+    SessionEnded,
+    FastestLap,
+    Retirement,
+    DRSEnabled,
+    DRSDisabled,
+    TeamMateInPits,
+    ChequeredFlag,
+    RaceWinner,
+    Penalty,
+    SpeedTrap,
+    StartLights,
+    LightsOut,
+    DriveThroughPenaltyServed,
+    StopGoPenaltyServed,
+    Flashback,
+    Buttons,
+    #[default]
+    Poisoned,
+}
+
+/// # Participants Packet
+/// This is a list of participants in the race. If the vehicle is controlled by AI, then the name will be the driver name. If this is a multiplayer game, the names will be the Steam Id on PC, or the LAN name if appropriate.
+/// N.B. on Xbox One, the names will always be the driver name, on PS4 the name will be the LAN name if playing a LAN game, otherwise it will be the driver name.
+/// The array should be indexed by vehicle index.
+/// Frequency: Every 5 seconds
+/// Size: 1284 bytes
+/// Version: 1
 #[repr(C, packed)] // Size: 56 Bytes
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Participant
 {
-    pub aiControlled: u8,               // Whether the vehicle is AI (1) or Human (0) controlled
-    pub driverId: u8,                   // Driver id - see appendix, 255 if network human
-    pub networkId: u8,                  // Network id – unique identifier for network players
-    pub teamId: u8,                     // Team id - see appendix
-    pub myTeam: u8,                     // My team flag – 1 = My Team, 0 = otherwise
-    pub raceNumber: u8,                 // Race number of the car
-    pub nationality: u8,                // Nationality of the driver
-    pub name: [u8; 48],                 // Name of participant in UTF-8 format – null terminated Will be truncated with … (U+2026) if too long
-    pub yourTelemetry: u8,              // The player's UDP setting, 0 = restricted, 1 = public
+    pub aiControlled: u8,                   // Whether the vehicle is AI (1) or Human (0) controlled
+    pub driverId: u8,                       // Driver id - see appendix, 255 if network human
+    pub networkId: u8,                      // Network id – unique identifier for network players
+    pub teamId: u8,                         // Team id - see appendix
+    pub myTeam: u8,                         // My team flag – 1 = My Team, 0 = otherwise
+    pub raceNumber: u8,                     // Race number of the car
+    pub nationality: u8,                    // Nationality of the driver
+    pub name: [u8; 32],                     // Name of participant in UTF-8 format – null terminated
+                                            // Will be truncated with … (U+2026) if too long
+    pub yourTelemetry: u8,                  // The player's UDP setting, 0 = restricted, 1 = public
+    pub showOnlineNames: u8,                // The player's show online names setting, 0 = off, 1 = on
+    pub techLevel: u16,                     // F1 World tech level
+    pub platform: u8,                       // 1 = Steam, 3 = PlayStation, 4 = Xbox, 6 = Origin, 255 = unknown
+    pub numColours: u8,                     // Number of colours valid for this car
+    pub liveryColours: [LiveryColour; 4],   // Colours for the car
 }
 
 impl Participant
@@ -1515,15 +1624,20 @@ impl Participant
             myTeam: bytes[4],
             raceNumber: bytes[5],
             nationality: bytes[6],
-            name: match bytes[7..55].try_into()
+            name: match bytes[7..39].try_into()
                     {
                         Ok(str) => str,
                         Err(err) => {
                             dbg!(err);
-                            [0; 48]
+                            [0; 32]
                         }
                     },
-            yourTelemetry: bytes[55]
+            yourTelemetry: bytes[39],
+            showOnlineNames: bytes[40],
+            techLevel: u16::from_le_bytes([bytes[41], bytes[42]]),
+            platform: bytes[43],
+            numColours: bytes[44],
+            liveryColours: LiveryColour::unpack(&bytes[45..])
         }
     }
 
@@ -1533,21 +1647,31 @@ impl Participant
     }
 }
 
-impl Default for Participant
+/// RGB value of a colour
+#[derive(Clone, Copy, Default)]
+pub struct LiveryColour
 {
-    fn default() -> Self
-    {
+    pub r: u8,  // Red
+    pub g: u8,  // Green
+    pub b: u8,  // Blue
+}
+
+impl LiveryColour {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
         Self {
-            aiControlled: 0,
-            driverId: 0,
-            networkId: 0,
-            teamId: 0,
-            myTeam: 0,
-            raceNumber: 0,
-            nationality: 0,
-            name: [0; 48],
-            yourTelemetry: 0
+            r: bytes[0],
+            g: bytes[1],
+            b: bytes[2],
         }
+    }
+
+    pub fn unpack(bytes: &[u8]) -> [Self; 4] {
+        [
+            Self::from_bytes(&bytes[ 0.. 3]),
+            Self::from_bytes(&bytes[ 3.. 6]),
+            Self::from_bytes(&bytes[ 6.. 9]),
+            Self::from_bytes(&bytes[ 9..12]),
+        ]
     }
 }
 
@@ -1582,11 +1706,12 @@ impl PacketParticipants
 {
     pub fn unpack(bytes: &[u8]) -> Self
     {
+        let sz_hdr = size_of::<Header>();
         Self {
             header: Header::unpack(bytes),
 
-            numActiveCars: bytes[25],
-            participants: Self::participants(&bytes[25..]),
+            numActiveCars: bytes[sz_hdr],
+            participants: Self::participants(&bytes[sz_hdr + 1..]),
         }
     }
 
@@ -1607,13 +1732,11 @@ impl PacketParticipants
     }
 }
 
-/**
- * # Car Setups Packet
- * This packet details the car setups for each vehicle in the session. Note that in multiplayer games, other player cars will appear as blank, you will only be able to see your car setup and AI cars.
- * Frequency: 2 per second
- * Size: 1102 bytes
- * Version: 1
- */
+/// # Car Setups Packet
+/// This packet details the car setups for each vehicle in the session. Note that in multiplayer games, other player cars will appear as blank, you will only be able to see your car setup and AI cars.
+/// Frequency: 2 per second
+/// Size: 1102 bytes
+/// Version: 1
 #[repr(C, packed)] // Size: 49 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarSetup
@@ -1704,14 +1827,11 @@ impl PacketCarSetups
     }
 }
 
-/**
- * # Car Telemetry Packet
- * This packet details telemetry for all the cars in the race. It details various values that would be recorded on the car such as speed, throttle application, DRS etc. Note that the rev light configurations are presented separately as well and will mimic real life driver preferences.
- * Frequency: Rate as specified in menus
- * Size: 1347 bytes
- * Version: 1
- */
-
+/// # Car Telemetry Packet
+/// This packet details telemetry for all the cars in the race. It details various values that would be recorded on the car such as speed, throttle application, DRS etc. Note that the rev light configurations are presented separately as well and will mimic real life driver preferences.
+/// Frequency: Rate as specified in menus
+/// Size: 1347 bytes
+/// Version: 1
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Kph {
@@ -1854,11 +1974,11 @@ impl fmt::Display for RevLights
             if (self.LEDs & LEDs::Four         as u16) != 0 { "O".green()  } else { "o".white() },
             if (self.LEDs & LEDs::Five         as u16) != 0 { "O".green()  } else { "o".white() },
             // Red
-            if (self.LEDs & LEDs::Six          as u16) != 0 {  "O".red()   } else { "o".white() },
-            if (self.LEDs & LEDs::Seven        as u16) != 0 {  "O".red()   } else { "o".white() },
-            if (self.LEDs & LEDs::Eight        as u16) != 0 {  "O".red()   } else { "o".white() },
-            if (self.LEDs & LEDs::Nine         as u16) != 0 {  "O".red()   } else { "o".white() },
-            if (self.LEDs & LEDs::Ten          as u16) != 0 {  "O".red()   } else { "o".white() },
+            if (self.LEDs & LEDs::Six          as u16) != 0 { "O".red()    } else { "o".white() },
+            if (self.LEDs & LEDs::Seven        as u16) != 0 { "O".red()    } else { "o".white() },
+            if (self.LEDs & LEDs::Eight        as u16) != 0 { "O".red()    } else { "o".white() },
+            if (self.LEDs & LEDs::Nine         as u16) != 0 { "O".red()    } else { "o".white() },
+            if (self.LEDs & LEDs::Ten          as u16) != 0 { "O".red()    } else { "o".white() },
             // Purple
             if (self.LEDs & LEDs::Eleven       as u16) != 0 { "O".purple() } else { "o".white() },
             if (self.LEDs & LEDs::Twelve       as u16) != 0 { "O".purple() } else { "o".white() },
@@ -1881,11 +2001,11 @@ impl fmt::Debug for RevLights
             if (self.LEDs & LEDs::Four         as u16) != 0 { "O".green()  } else { "o".white() },
             if (self.LEDs & LEDs::Five         as u16) != 0 { "O".green()  } else { "o".white() },
             // Red
-            if (self.LEDs & LEDs::Six          as u16) != 0 {  "O".red()   } else { "o".white() },
-            if (self.LEDs & LEDs::Seven        as u16) != 0 {  "O".red()   } else { "o".white() },
-            if (self.LEDs & LEDs::Eight        as u16) != 0 {  "O".red()   } else { "o".white() },
-            if (self.LEDs & LEDs::Nine         as u16) != 0 {  "O".red()   } else { "o".white() },
-            if (self.LEDs & LEDs::Ten          as u16) != 0 {  "O".red()   } else { "o".white() },
+            if (self.LEDs & LEDs::Six          as u16) != 0 { "O".red()    } else { "o".white() },
+            if (self.LEDs & LEDs::Seven        as u16) != 0 { "O".red()    } else { "o".white() },
+            if (self.LEDs & LEDs::Eight        as u16) != 0 { "O".red()    } else { "o".white() },
+            if (self.LEDs & LEDs::Nine         as u16) != 0 { "O".red()    } else { "o".white() },
+            if (self.LEDs & LEDs::Ten          as u16) != 0 { "O".red()    } else { "o".white() },
             // Purple
             if (self.LEDs & LEDs::Eleven       as u16) != 0 { "O".purple() } else { "o".white() },
             if (self.LEDs & LEDs::Twelve       as u16) != 0 { "O".purple() } else { "o".white() },
@@ -1986,7 +2106,7 @@ impl MFDPanel
     }
 }
 
-#[repr(C, packed)] // Size: 1347 Bytes
+#[repr(C, packed)] // Size: 1352 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarTelemetry
 {
@@ -2006,11 +2126,11 @@ impl PacketCarTelemetry
         Self {
             header            : Header::unpack(bytes),
 
-            carTelemetry      : Self::carTelemetry(&bytes[24..1344]),
+            carTelemetry      : Self::carTelemetry(&bytes[29..1349]),
 
-            mfdFirstPlayer    : MFDPanel::from_u8(&bytes[1344]),
-            mfdSecondaryPlayer: MFDPanel::from_u8(&bytes[1345]),
-            suggestedGear     : Gear::from_u8_to_i8(&bytes[1346])
+            mfdFirstPlayer    : MFDPanel::from_u8(&bytes[1350]),
+            mfdSecondaryPlayer: MFDPanel::from_u8(&bytes[1351]),
+            suggestedGear     : Gear::from_u8_to_i8(&bytes[1352])
         }
     }
 
@@ -2031,13 +2151,11 @@ impl PacketCarTelemetry
     }
 }
 
-/**
- * # Car Status Packet
- * This packet details car statuses for all the cars in the race.
- * Frequency: Rate as specified in menus
- * Size: 1058 bytes
- * Version: 1
- */
+/// # Car Status Packet
+/// This packet details car statuses for all the cars in the race.
+/// Frequency: Rate as specified in menus
+/// Size: 1058 bytes
+/// Version: 1
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum TC {
@@ -2091,6 +2209,8 @@ impl FuelMix
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum ActualCompound {
+             C6 = 22,
+             C0 = 21,
              C1 = 20,
              C2 = 19,
              C3 = 18,
@@ -2114,21 +2234,23 @@ impl ActualCompound {
     {
         match byte
         {
-            20 => ActualCompound::C1,
-            19 => ActualCompound::C2,
-            18 => ActualCompound::C3,
-            17 => ActualCompound::C4,
-            16 => ActualCompound::C5,
-            15 => ActualCompound::F2Wet,
-            14 => ActualCompound::F2Hard,
-            13 => ActualCompound::F2Medium,
-            12 => ActualCompound::F2Soft,
-            11 => ActualCompound::F2SuperSoft,
-            10 => ActualCompound::ClassicWet,
-             9 => ActualCompound::ClassicDry,
-             8 => ActualCompound::Wet,
-             7 => ActualCompound::Inter,
-             _ => ActualCompound::Poisoned,
+            22 => Self::C6,
+            21 => Self::C0,
+            20 => Self::C1,
+            19 => Self::C2,
+            18 => Self::C3,
+            17 => Self::C4,
+            16 => Self::C5,
+            15 => Self::F2Wet,
+            14 => Self::F2Hard,
+            13 => Self::F2Medium,
+            12 => Self::F2Soft,
+            11 => Self::F2SuperSoft,
+            10 => Self::ClassicWet,
+             9 => Self::ClassicDry,
+             8 => Self::Wet,
+             7 => Self::Inter,
+             _ => Self::Poisoned,
         }
     }
 }
@@ -2137,21 +2259,23 @@ impl fmt::Display for ActualCompound {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self
         {
-                     ActualCompound::C1 => write!(f, "C1"),
-                     ActualCompound::C2 => write!(f, "C2"),
-                     ActualCompound::C3 => write!(f, "C3"),
-                     ActualCompound::C4 => write!(f, "C4"),
-                     ActualCompound::C5 => write!(f, "C5"),
-                  ActualCompound::F2Wet => write!(f, "W"),
-                 ActualCompound::F2Hard => write!(f, "H"),
-               ActualCompound::F2Medium => write!(f, "M"),
-                 ActualCompound::F2Soft => write!(f, "S"),
-            ActualCompound::F2SuperSoft => write!(f, "S"),
-             ActualCompound::ClassicWet => write!(f, "W"),
-             ActualCompound::ClassicDry => write!(f, "D"),
-                    ActualCompound::Wet => write!(f, "W"),
-                  ActualCompound::Inter => write!(f, "I"),
-                                      _ => write!(f, ""),
+            Self::C0            => write!(f, "C0"),
+            Self::C1            => write!(f, "C1"),
+            Self::C2            => write!(f, "C2"),
+            Self::C3            => write!(f, "C3"),
+            Self::C4            => write!(f, "C4"),
+            Self::C5            => write!(f, "C5"),
+            Self::C6            => write!(f, "C6"),
+            Self::F2Wet         => write!(f, "w"),
+            Self::F2Hard        => write!(f, "h"),
+            Self::F2Medium      => write!(f, "m"),
+            Self::F2Soft        => write!(f, "s"),
+            Self::F2SuperSoft   => write!(f, "ss"),
+            Self::ClassicWet    => write!(f, "w"),
+            Self::ClassicDry    => write!(f, "d"),
+            Self::Wet           => write!(f, "W"),
+            Self::Inter         => write!(f, "I"),
+            _                   => write!(f, ""),
         }
     }
 }
@@ -2164,9 +2288,11 @@ pub enum VisualCompound {
          OldSoft = 20,
     OldSuperSoft = 19,
             Hard = 18,
-            Soft = 16,
           Medium = 17,
+            Soft = 16,
           OldWet = 15,
+      ClassicWet = 10,
+      ClassicDry = 9,
              Wet = 8,
            Inter = 7,
          #[default]
@@ -2178,17 +2304,19 @@ impl VisualCompound {
     {
         match byte
         {
-            22 => VisualCompound::OldHard,
-            21 => VisualCompound::OldMedium,
-            20 => VisualCompound::OldSoft,
-            19 => VisualCompound::OldSuperSoft,
-            18 => VisualCompound::Hard,
-            16 => VisualCompound::Soft,
-            17 => VisualCompound::Medium,
-            15 => VisualCompound::OldWet,
-             8 => VisualCompound::Wet,
-             7 => VisualCompound::Inter,
-             _ => VisualCompound::Poisoned,
+            22 => Self::OldHard,
+            21 => Self::OldMedium,
+            20 => Self::OldSoft,
+            19 => Self::OldSuperSoft,
+            18 => Self::Hard,
+            16 => Self::Soft,
+            17 => Self::Medium,
+            15 => Self::OldWet,
+            10 => Self::ClassicWet,
+             9 => Self::ClassicDry,
+             8 => Self::Wet,
+             7 => Self::Inter,
+             _ => Self::Poisoned,
         }
     }
 }
@@ -2198,17 +2326,19 @@ impl fmt::Display for VisualCompound {
     {
         match self
         {
-            VisualCompound::OldHard      => write!(f, "H"),
-            VisualCompound::OldMedium    => write!(f, "M"),
-            VisualCompound::OldSoft      => write!(f, "SS"),
-            VisualCompound::OldSuperSoft => write!(f, "P"),
-            VisualCompound::Hard         => write!(f, "H"),
-            VisualCompound::Soft         => write!(f, "S"),
-            VisualCompound::Medium       => write!(f, "M"),
-            VisualCompound::OldWet       => write!(f, "W"),
-            VisualCompound::Wet          => write!(f, "W"),
-            VisualCompound::Inter        => write!(f, "I"),
-                                       _ => write!(f, "?"),
+            Self::OldHard      => write!(f, "h"),
+            Self::OldMedium    => write!(f, "m"),
+            Self::OldSoft      => write!(f, "s"),
+            Self::OldSuperSoft => write!(f, "ss"),
+            Self::Hard         => write!(f, "H"),
+            Self::Medium       => write!(f, "M"),
+            Self::Soft         => write!(f, "S"),
+            Self::OldWet       => write!(f, "w"),
+            Self::ClassicWet   => write!(f, "w"),
+            Self::ClassicDry   => write!(f, "d"),
+            Self::Wet          => write!(f, "W"),
+            Self::Inter        => write!(f, "I"),
+                             _ => write!(f, "?"),
         }
     }
 }
@@ -2260,6 +2390,8 @@ pub struct CarStatus
     pub visualTyre: VisualCompound,     // u8 - The Visual look of the Rubber
     pub tyresAgeLaps: u8,               // Age in laps of the current set of tyres
     pub vehicleFiaFlags: ZoneFlag,      // u8
+    pub enginePowerICE: f32,            // Engine power output of ICE (W)
+    pub enginePowerMGUK: f32,           // Engine power output of MGU-K (W)
     pub ersStoreEnergy: f32,            // ERS energy store in Joules
     pub ersDeployMode: ErsDeployMode,   // u8
     pub ersHarvestedThisLapMGUK: f32,   // ERS energy harvested this lap by MGU-K
@@ -2291,17 +2423,19 @@ impl CarStatus
                      visualTyre: VisualCompound::from_u8(&bytes[26]),
                    tyresAgeLaps: bytes[27],
                 vehicleFiaFlags:       ZoneFlag::from_u8_to_i8(&bytes[28]),
-                 ersStoreEnergy:            f32::from_le_bytes([bytes[29], bytes[30], bytes[31], bytes[32]]),
-                  ersDeployMode:  ErsDeployMode::from_u8(&bytes[25]),
-        ersHarvestedThisLapMGUK:            f32::from_le_bytes([bytes[33], bytes[34], bytes[35], bytes[36]]),
-        ersHarvestedThisLapMGUH:            f32::from_le_bytes([bytes[37], bytes[38], bytes[39], bytes[40]]),
-             ersDeployedThisLap:            f32::from_le_bytes([bytes[41], bytes[42], bytes[43], bytes[44]]),
-                  networkPaused: bytes[45],
+                 enginePowerICE: f32::from_le_bytes([bytes[29], bytes[30], bytes[31], bytes[32]]),
+                enginePowerMGUK: f32::from_le_bytes([bytes[33], bytes[34], bytes[35], bytes[36]]),           // Engine power output of MGU-K (W)
+                 ersStoreEnergy:            f32::from_le_bytes([bytes[37], bytes[38], bytes[39], bytes[40]]),
+                  ersDeployMode:  ErsDeployMode::from_u8(&bytes[41]),
+        ersHarvestedThisLapMGUK:            f32::from_le_bytes([bytes[42], bytes[43], bytes[44], bytes[45]]),
+        ersHarvestedThisLapMGUH:            f32::from_le_bytes([bytes[46], bytes[47], bytes[48], bytes[49]]),
+             ersDeployedThisLap:            f32::from_le_bytes([bytes[50], bytes[51], bytes[52], bytes[53]]),
+                  networkPaused: bytes[54],
         }
     }
 }
 
-#[repr(C, packed)] // Size: 992
+#[repr(C, packed)] // Size: 1239
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PacketCarStatus
 {
@@ -2317,7 +2451,7 @@ impl PacketCarStatus
         Self {
             header: Header::unpack(bytes),
 
-            carStatus: Self::carStatus(&bytes[24..]),
+            carStatus: Self::carStatus(&bytes[29..]),
         }
     }
 
@@ -2338,13 +2472,11 @@ impl PacketCarStatus
     }
 }
 
-/**
- * # Final Classification Packet
- * This packet details the final classification at the end of the race, and the data will match with the post race results screen. This is especially useful for multiplayer games where it is not always possible to send lap times on the final frame because of network delay.
- * Frequency: Once at the end of a race
- * Size: 1015 bytes
- * Version: 1
- */
+/// # Final Classification Packet
+/// This packet details the final classification at the end of the race, and the data will match with the post race results screen. This is especially useful for multiplayer games where it is not always possible to send lap times on the final frame because of network delay.
+/// Frequency: Once at the end of a race
+/// Size: 1015 bytes
+/// Version: 1
 #[repr(C, packed)] // Size: 45 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct FinalClassification
@@ -2450,13 +2582,11 @@ impl PacketFinalClassification
     }
 }
 
-/**
- * # Lobby Info Packet
- * This packet details the players currently in a multiplayer lobby. It details each player’s selected car, any AI involved in the game and also the ready status of each of the participants.
- * Frequency: Two every second when in the lobby
- * Size: 1191 bytes
- * Version: 1
- */
+/// # Lobby Info Packet
+/// This packet details the players currently in a multiplayer lobby. It details each player’s selected car, any AI involved in the game and also the ready status of each of the participants.
+/// Frequency: Two every second when in the lobby
+/// Size: 1191 bytes
+/// Version: 1
 #[repr(C, packed)] // Size: 53 Bytes
 #[derive(Clone, Copy)]
 pub struct LobbyInfo
@@ -2588,13 +2718,11 @@ impl PacketLobbyInfo
     }
 }
 
-/**
- * # Car Damage Packet
- * This packet details car damage parameters for all the cars in the race.
- * Frequency: 2 per second
- * Size: 948 bytes
- * Version: 1
- */
+/// # Car Damage Packet
+/// This packet details car damage parameters for all the cars in the race.
+/// Frequency: 2 per second
+/// Size: 948 bytes
+/// Version: 1
 #[repr(C, packed)] // Size: 42 Bytes
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CarDamage
@@ -2689,15 +2817,12 @@ impl PacketCarDamage
     }
 }
 
-/**
- * # Session History Packet
- * This packet contains lap times and tyre usage for the session. **This packet works slightly differently to other packets. To reduce CPU and bandwidth, each packet relates to a specific vehicle and is sent every 1/20 s, and the vehicle being sent is cycled through. Therefore in a 20 car race you should receive an update for each vehicle at least once per second.**
- * Note that at the end of the race, after the final classification packet has been sent, a final bulk update of all the session histories for the vehicles in that session will be sent.
- * Frequency: 20 per second but cycling through cars
- * Size: 1155 bytes
- * Version: 1
- */
-
+/// # Session History Packet
+/// This packet contains lap times and tyre usage for the session. **This packet works slightly differently to other packets. To reduce CPU and bandwidth, each packet relates to a specific vehicle and is sent every 1/20 s, and the vehicle being sent is cycled through. Therefore in a 20 car race you should receive an update for each vehicle at least once per second.**
+/// Note that at the end of the race, after the final classification packet has been sent, a final bulk update of all the session histories for the vehicles in that session will be sent.
+/// Frequency: 20 per second but cycling through cars
+/// Size: 1155 bytes
+/// Version: 1
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Valid
