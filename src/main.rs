@@ -758,8 +758,7 @@ fn main() {
 
         // Header
         println!(
-                "{idx:2} {pos:2} {driver:>15} (##) {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1} {tyre:>4} | {gear:>1} {DRS:^5} {speed:>3} | {state:^5}",
-                idx         = "ID",
+                "{pos:2} {driver:>15} (##) {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1} {tyre:>4} | {gear:>1} {DRS:^5} {speed:>3} | {state:^5}",
                 pos         = "P",
                 driver      = "Driver",
                 timeLastLap = "Last",
@@ -778,12 +777,8 @@ fn main() {
                 state       = "State"
             );
 
-        // Cars
-        // Need to figure out how to "zip" this together with:
-        // let p: usize = page.positions[i as usize].into();
-        // So that they are ordered correctly.
         for (pos, idx) in page.positions.iter().enumerate() {
-            if *idx > 22 {
+            if *idx > page.playerCarIndex as usize {
                 // Skip empty slots.
                 continue;
             }
@@ -791,7 +786,7 @@ fn main() {
             let car = &page.car[*idx];
 
             println!(
-                "{idx:02} {pos:02} {driver} {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1}  {tyre:>4} | {gear:>1} {DRS} {speed:>3} | {state:^5}",
+                "{pos:02} {driver} {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1}  {tyre:>4} | {gear:>1} {DRS} {speed:>3} | {state:^5}",
                 driver      = car.driver.getDriver(),
                 timeLastLap = car.time.lastLap,
                 interval    = car.time.interval,
@@ -815,8 +810,7 @@ fn main() {
 
         // Bests
         println!(
-            "{idx:2} {pos:2} {driver:>15}      {bestLapTime:>8} | {interval:>8} | {leader:>8} | {bestSector1:>8} {bestSector2:>8} {bestSector3:>8} | {bestPossible:>8.3}",
-            idx         = "",
+            "{pos:2} {driver:>15}      {bestLapTime:>8} | {interval:>8} | {leader:>8} | {bestSector1:>8} {bestSector2:>8} {bestSector3:>8} | {bestPossible:>8.3}",
             pos         = "",
             driver      = "Bests",
             interval    = "",
