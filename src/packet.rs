@@ -413,7 +413,7 @@ impl fmt::Display for Session {
             Self::Race2         => write!(f, "Race2"),
             Self::Race3         => write!(f, "Race3"),
             Self::TimeTrial     => write!(f, "Time"),
-            _                   => write!(f, ""),
+            _                   => write!(f, "???"),
         }
     }
 }
@@ -558,7 +558,7 @@ pub struct PacketSession
     pub numSafetyCarPeriods: u8,                // Number of safety cars called during session
     pub numVirtualSafetyCarPeriods: u8,         // Number of virtual safety cars called during session
     pub numRedFlagPeriods: u8,                  // Number of red flags called during session
-    pub equalCarPerformance: u8,                // 0 = Off, 1 = On
+    pub equalCarPerformance: Assist,            // u8
     pub recoveryMode: u8,                       // 0 = None, 1 = Flashbacks, 2 = Auto-recovery
     pub flashbackLimit: u8,                     // 0 = Low, 1 = Medium, 2 = High, 3 = Unlimited
     pub surfaceType: u8,                        // 0 = Simplified, 1 = Realistic
@@ -644,7 +644,7 @@ impl PacketSession
             numSafetyCarPeriods             : bytes[705],
             numVirtualSafetyCarPeriods      : bytes[706],
             numRedFlagPeriods               : bytes[707],
-            equalCarPerformance             : bytes[708],
+            equalCarPerformance             : Assist::from_u8(&bytes[708]),
             recoveryMode                    : bytes[709],
             flashbackLimit                  : bytes[710],
             surfaceType                     : bytes[711],
@@ -824,9 +824,9 @@ impl Assist
     {
         match byte
         {
-            0 => Assist::Off,
-            1 => Assist::On,
-            _ => Assist::Poisoned
+            0 => Self::Off,
+            1 => Self::On,
+            _ => Self::Poisoned
         }
     }
 }
