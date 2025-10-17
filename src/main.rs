@@ -507,6 +507,9 @@ fn main() {
                             positions: [usize::MAX; 23],
                             ..Page::default()
                         };
+                        for car in &mut page.car {
+                            car.time = Times::default();
+                        }
                     },
                     _ => {
                         // Not handling these.
