@@ -7,6 +7,11 @@ use std::fmt;
 // https://answers.ea.com/t5/General-Discussion/F1-22-UDP-Specification/td-p/11551274
 // https://forums.ea.com/blog/f1-games-game-info-hub-en/ea-sports%e2%84%a2-f1%c2%ae25-udp-specification/12187347
 
+pub static MAX_NUM_CARS_IN_UDP_DATA: usize = 22;
+pub static MAX_PARTICIPANT_NANE_LEN: usize = 32;
+pub static MAX_TYRE_STINTS: usize = 8;
+pub static MAX_NUM_TYRE_SETS: usize = 13 + 7; // 13 slick and 7 wet weather
+
 //
 // # Packet Header
 // Each packet has the following header:
@@ -517,8 +522,8 @@ pub struct PacketSession
     pub sessionType: Session,                   // u8
     pub trackId: i8,                            // -1 for unknown, see appendix
     pub formula: Formula,                       // u8
-    pub sessionTimeLeft: u16,                   // Time left in session in seconds
-    pub sessionDuration: u16,                   // Session duration in seconds
+    pub sessionTimeLeft: SessionTime,           // Time left in session in seconds
+    pub sessionDuration: SessionTime,           // Session duration in seconds
     pub pitSpeedLimit: u8,                      // Pit speed limit in kilometres per hour
     pub gamePaused: u8,                         // Whether the game is paused – network game only
     pub isSpectating: u8,                       // Whether the player is spectating
@@ -603,8 +608,8 @@ impl PacketSession
             sessionType                     : Session::from_u8(&bytes[35]),
             trackId                         : bytes[36] as i8,
             formula                         : Formula::from_u8(&bytes[37]),
-            sessionTimeLeft                 : u16::from_le_bytes([bytes[38], bytes[39]]),
-            sessionDuration                 : u16::from_le_bytes([bytes[40], bytes[41]]),
+            sessionTimeLeft                 : SessionTime::unpack(&[bytes[38], bytes[39]]),
+            sessionDuration                 : SessionTime::unpack(&[bytes[40], bytes[41]]),
             pitSpeedLimit                   : bytes[42],
             gamePaused                      : bytes[43],
             isSpectating                    : bytes[44],
@@ -707,6 +712,31 @@ impl PacketSession
         }
 
         wf
+    }
+}
+
+
+#[repr(C, packed)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SessionTime {
+    pub time: u16,  // session in seconds
+}
+
+impl SessionTime {
+    pub fn unpack(bytes: &[u8]) -> Self {
+        Self {
+            time: u16::from_le_bytes([bytes[0], bytes[1]])
+        }
+    }
+}
+
+impl fmt::Display for SessionTime {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let hours = self.time / 3600;
+        let minutes = (self.time % 3600) / 60;
+        let seconds = self.time % 60;
+
+        write!(f, "{:02}:{:02}:{:02}", hours, minutes, seconds)
     }
 }
 
@@ -2382,10 +2412,10 @@ impl ErsDeployMode
     {
         match byte
         {
-            0 => ErsDeployMode::None,
-            1 => ErsDeployMode::Medium,
-            2 => ErsDeployMode::Hotlap,
-            3 => ErsDeployMode::Overtake,
+            0 => Self::None,
+            1 => Self::Medium,
+            2 => Self::Hotlap,
+            3 => Self::Overtake,
             _ => ErsDeployMode::Poisoned,
         }
     }
@@ -2930,7 +2960,7 @@ impl TyreStintHistory
 #[derive(Debug, Clone, Copy)]
 pub struct PacketSessionHistory
 {
-    pub header: Header,         // 24 Bytes - Header
+    pub header: Header,         // 29 Bytes - Header
 
     pub carIdx: u8,             // Index of the car this lap data relates to
     pub numLaps: u8,            // Num laps in the data (including current partial lap)
@@ -2952,15 +2982,15 @@ impl PacketSessionHistory
         Self {
             header           : Header::unpack(bytes),
 
-            carIdx           : bytes[24],
-            numLaps          : bytes[25],
-            numTyreStints    : bytes[26],
-            bestLapTimeLapNum: bytes[27],
-            bestSector1LapNum: bytes[28],
-            bestSector2LapNum: bytes[29],
-            bestSector3LapNum: bytes[30],
-            lapHistory       : Self::lapHistory(&bytes[24+7..(24+7)+(11*100)]),
-            tyreStintsHistory: Self::tyreStintHistory(&bytes[(24+7)+(11*100)..(24+7)+(11*100)+(3*8)]),
+            carIdx           : bytes[29],
+            numLaps          : bytes[30],
+            numTyreStints    : bytes[31],
+            bestLapTimeLapNum: bytes[32],
+            bestSector1LapNum: bytes[33],
+            bestSector2LapNum: bytes[34],
+            bestSector3LapNum: bytes[35],
+            lapHistory       : Self::lapHistory(&bytes[29+7..(29+7)+(11*100)]),
+            tyreStintsHistory: Self::tyreStintHistory(&bytes[(29+7)+(11*100)..(29+7)+(11*100)+(3*8)]),
         }
     }
 
@@ -2994,5 +3024,84 @@ impl PacketSessionHistory
         }
 
         tsh
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Tyre Sets - 231 bytes
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// Data about one tyre set
+//-----------------------------------------------------------------------------
+#[repr(C, packed)] // Size: 1155 Bytes
+#[derive(Debug, Default, Clone, Copy)]
+struct TyreSet
+{
+    actualCompound: ActualCompound,                 // Actual tyre compound used
+    visualCompound: VisualCompound,                 // Visual tyre compound used
+    wear: u8,                                       // Tyre wear (percentage)
+    available: u8,                                  // Whether this set is currently available
+    recommendedSession: u8,                         // Recommended session for tyre set, see appendix
+    lifeSpan: u8,                                   // Laps left in this tyre set
+    usableLife: u8,                                 // Max number of laps recommended for this compound
+    lapDeltaTime: i16,                              // Lap delta time in milliseconds compared to fitted set
+    fitted: u8,                                     // Whether the set is fitted or not
+}
+
+impl TyreSet
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            actualCompound: ActualCompound::from_u8(&bytes[0]),
+            visualCompound: VisualCompound::from_u8(&bytes[1]),
+            wear: bytes[2],
+            available: bytes[3],
+            recommendedSession: bytes[4],
+            lifeSpan: bytes[5],
+            usableLife: bytes[6],
+            lapDeltaTime: i16::from_le_bytes([bytes[7], bytes[8]]),
+            fitted: bytes[9],
+        }
+    }
+}
+
+struct TyreSetsData
+{
+    pub header: Header,                             // 29 Bytes - Header
+
+    // Packet specific data
+    pub carIdx: u8,                                 // Index of the car this data relates to
+    pub tyreSetData: [TyreSet; MAX_NUM_TYRE_SETS],  // 13 (dry) + 7 (wet)
+    pub fittedIdx: u8                               // Index into array of fitted tyre
+}
+
+impl TyreSetsData
+{
+    pub fn unpack(bytes: &[u8]) -> Self
+    {
+        Self {
+            header           : Header::unpack(bytes),
+            carIdx           : bytes[29],
+            tyreSetData      : Self::tyre_set(&bytes[29 .. 29 + (size_of::<TyreSet>() * MAX_NUM_TYRE_SETS)]),
+            fittedIdx        : bytes[bytes.len() - 1]
+        }
+    }
+
+    pub fn tyre_set(bytes: &[u8]) -> [TyreSet; MAX_NUM_TYRE_SETS]
+    {
+        let mut t = [TyreSet::default(); MAX_NUM_TYRE_SETS];
+        let size = size_of::<TyreSet>();
+
+        for (i, t) in t.iter_mut().enumerate()
+        {
+            let s = i * size;
+            let e = s + size;
+
+            *t = TyreSet::unpack(&bytes[s..e]);
+        }
+
+        t
     }
 }

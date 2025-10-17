@@ -98,11 +98,11 @@ struct Drs {
 impl fmt::Display for Drs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.isOpen {
-            write!(f, "[{}]", "DRS".black().on_green())
+            write!(f, "{}", "DRS".black().on_green())
         } else if self.isAllowed {
-            write!(f, "[{}]", "DRS".green())
+            write!(f, "{}", "DRS".green())
         } else {
-            write!(f, "[DRS]")
+            write!(f, "DRS")
         }
     }
 }
@@ -253,6 +253,7 @@ struct Car {
     pub tyres: Tyres,
     pub telemetry: Telemetry,
     pub time: Times,
+    pub Ers: Ers,
 
     // PacketLap.laps
     pub spotGrid: u8,        // gridPosition
@@ -261,6 +262,37 @@ struct Car {
     pub pitCount: u8,        // numPitStops
     pub carStatus: CarState, // driverStatus
     pub sector: u8,          // sector
+}
+
+#[derive(Debug, Default, Clone)]
+struct Ers {
+    pub storeEnergy: f32,           // ERS energy store in Joules
+    pub deployMode: ErsDeployMode,  // u8
+}
+
+impl Ers {
+    pub fn build(storeEnergy: f32, deployMode: ErsDeployMode) -> Self {
+        Self {
+            storeEnergy,
+            deployMode,
+        }
+    }
+}
+
+impl fmt::Display for Ers {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        static ERS_MAX: f32 = 4_000_000.; // 4MJ
+
+        let ersPercent = format!("{:3.0}", ((self.storeEnergy / ERS_MAX) * 100.));
+
+        match self.deployMode {
+            ErsDeployMode::None => write!(f, "{:>3}", ersPercent.red()),
+            ErsDeployMode::Medium => write!(f, "{:>3}", ersPercent.green()),
+            ErsDeployMode::Hotlap => write!(f, "{:>3}", ersPercent.yellow()),
+            ErsDeployMode::Overtake => write!(f, "{:>3}", ersPercent.black().on_yellow()),
+            _ => write!(f, "{:>3}", ersPercent)
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -405,6 +437,8 @@ struct Page {
     ob: Best,
     car: [Car; 23],
     lap: SessionLap,
+    sessionTimeLeft: SessionTime,
+    sessionDuration: SessionTime,
 }
 
 fn main() {
@@ -520,6 +554,8 @@ fn main() {
                 page.playerCarIndex = s.header.playerCarIndex;
                 page.lap.total = s.totalLaps;
                 page.session = s.sessionType;
+                page.sessionDuration = s.sessionDuration;
+                page.sessionTimeLeft = s.sessionTimeLeft;
             }
             Packet::Participants(p) => {
                 page.participants = p.numActiveCars;
@@ -561,6 +597,9 @@ fn main() {
                     page.car[idx].tyres.visual = s.carStatus[idx].visualTyre;
                     page.car[idx].tyres.age = s.carStatus[idx].tyresAgeLaps;
                     page.car[idx].driver.underFlag = s.carStatus[idx].vehicleFiaFlags;
+
+                    // ERS
+                    page.car[idx].Ers = Ers::build(s.carStatus[idx].ersStoreEnergy, s.carStatus[idx].ersDeployMode);
                 }
             }
             Packet::Lap(l) => {
@@ -753,15 +792,17 @@ fn main() {
         print!("{ESC}c");
 
         println!(
-            "{session:>5} {lapLeader:02} {lapTotal:02}",
+            "{session:>5} {lapLeader:02} {lapTotal:02} [{timeLeft} of {duration}]",
             session   = page.session,
             lapLeader = page.lap.leader,
             lapTotal  = page.lap.total,
+            timeLeft  = page.sessionTimeLeft,
+            duration  = page.sessionDuration,
         );
 
         // Header
         println!(
-                "{pos:2} {driver:>15} (##) {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1} {tyre:>4} | {gear:>1} {DRS:^5} {speed:>3} | {state:^5}",
+                "{pos:2} {driver:>15} (##) {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1} {tyre:>4} | {gear:>1} {DRS:^3} {ERS:^3} {speed:>3} | {state:^5}",
                 pos         = "P",
                 driver      = "Driver",
                 timeLastLap = "Last",
@@ -776,6 +817,7 @@ fn main() {
                 tyre        = "Tyre",
                 gear        = "G",
                 DRS         = "DRS",
+                ERS         = "ERS",
                 speed       = "KPH",
                 state       = "State"
             );
@@ -789,7 +831,7 @@ fn main() {
             let car = &page.car[*idx];
 
             println!(
-                "{pos:02} {driver} {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1}  {tyre:>4} | {gear:>1} {DRS} {speed:>3} | {state:^5}",
+                "{pos:02} {driver} {timeLastLap:>8} | {interval:>8} | {leader:>8} | {timeSector1:>8} {timeSector2:>8} {timeSector3:>8} | {timeCurrent:>8} | {lap:>3} {sector:^1}  {tyre:>4} | {gear:>1} {DRS} {ERS} {speed:>3} | {state:^5}",
                 driver      = car.driver.getDriver(),
                 timeLastLap = car.time.lastLap,
                 interval    = car.time.interval,
@@ -803,6 +845,7 @@ fn main() {
                 tyre        = car.tyres,
                 gear        = car.telemetry.gear,
                 DRS         = car.Drs,
+                ERS         = car.Ers,
                 speed       = car.telemetry.speed.kph,
                 state       = car.carStatus
             );
